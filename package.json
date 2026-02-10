@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "nodemon src/backend/index.js",
-    "dev:frontend": "cd src/frontend && npx vite",
-    "build": "cd src/frontend && npx vite build",
+    "dev:frontend": "cd src/frontend && vite",
+    "build": "cd src/frontend && vite build",
     "start": "node src/backend/index.js"
   },
   "dependencies": {

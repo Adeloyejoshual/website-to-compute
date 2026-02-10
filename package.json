@@ -1,12 +1,13 @@
 {
-  "name": "minimart-marketplace",
+  "name": "minimart",
   "version": "1.0.0",
   "private": true,
+  "description": "MiniMart single project with backend + frontend",
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "nodemon src/backend/index.js",
-    "dev:frontend": "vite --config vite.config.js",
-    "build": "cd src/frontend && npm install && npm run build",
+    "dev:frontend": "cd src/frontend && npm install && vite",
+    "build": "cd src/frontend && npm install && vite build",
     "start": "node src/backend/index.js"
   },
   "dependencies": {
@@ -18,13 +19,12 @@
     "pg": "^8.11.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.14.1",
     "uuid": "^9.0.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.0.0",
-    "nodemon": "^3.0.2",
-    "vite": "^4.6.14"
+    "vite": "^4.7.11",
+    "@vitejs/plugin-react": "^4.7.0",
+    "nodemon": "^3.0.2"
   },
   "engines": {
     "node": "20.x"

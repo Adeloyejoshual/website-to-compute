@@ -5,18 +5,16 @@ import dotenv from "dotenv";
 import { addProduct, getProducts } from "./db.js";
 
 dotenv.config();
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "dist")));
 
-// --- API Routes ---
+// Add product
 app.post("/api/products", async (req, res) => {
   try {
     const { name, description, price } = req.body;
@@ -25,22 +23,23 @@ app.post("/api/products", async (req, res) => {
     const product = await addProduct(name, description || "", parseFloat(price));
     res.json(product);
   } catch (err) {
-    console.error("Error in /api/products:", err);
+    console.error("Error adding product:", err);
     res.status(500).send("Error adding product");
   }
 });
 
+// Get products
 app.get("/api/products", async (req, res) => {
   try {
     const products = await getProducts();
     res.json(products);
   } catch (err) {
-    console.error("Error in /api/products GET:", err);
+    console.error("Error fetching products:", err);
     res.status(500).send("Error fetching products");
   }
 });
 
-// Serve frontend for all other routes
+// Serve frontend
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "dist", "index.html"));
 });

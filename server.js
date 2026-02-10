@@ -1,50 +1,49 @@
+// server.js
 import express from "express";
-import path from "path";
-import { fileURLToPath } from "url";
+import cors from "cors";
 import dotenv from "dotenv";
-import { addProduct, getProducts } from "./db.js";
+import { initDB, addProduct, getProducts } from "./db.js";
 
 dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Middleware
+app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "dist")));
 
-// Add product
-app.post("/api/products", async (req, res) => {
-  try {
-    const { name, description, price } = req.body;
-    if (!name || !price) return res.status(400).send("Name and price required");
+// Initialize DB tables
+await initDB();
 
-    const product = await addProduct(name, description || "", parseFloat(price));
-    res.json(product);
-  } catch (err) {
-    console.error("Error adding product:", err);
-    res.status(500).send("Error adding product");
-  }
-});
+// Routes
+app.get("/", (req, res) => res.send("MiniMart API is running"));
 
-// Get products
+// Get all products
 app.get("/api/products", async (req, res) => {
   try {
     const products = await getProducts();
     res.json(products);
   } catch (err) {
-    console.error("Error fetching products:", err);
+    console.error("Error fetching products:", err.stack);
     res.status(500).send("Error fetching products");
   }
 });
 
-// Serve frontend
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "dist", "index.html"));
+// Add product
+app.post("/api/products", async (req, res) => {
+  try {
+    const { name, description, price } = req.body;
+    console.log("Received product:", req.body);
+
+    const product = await addProduct(name, description, price);
+    console.log("Product added:", product);
+
+    res.json(product);
+  } catch (err) {
+    console.error("Error adding product:", err.stack);
+    res.status(500).send(err.message);
+  }
 });
 
-app.listen(PORT, () => {
-  console.log(`MiniMart running on port ${PORT}`);
-});
+// Start server
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

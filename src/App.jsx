@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import ReactDOM from "react-dom/client";
 import axios from "axios";
 
 function App() {
@@ -42,9 +41,9 @@ function App() {
       <h1>MiniMart</h1>
 
       <form onSubmit={handleSubmit} style={{ marginBottom: 20 }}>
-        <input type="text" name="name" placeholder="Name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
-        <input type="text" name="description" placeholder="Description" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
-        <input type="number" name="price" placeholder="Price" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} required />
+        <input type="text" placeholder="Name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
+        <input type="text" placeholder="Description" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+        <input type="number" placeholder="Price" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} required />
         <button type="submit">Add Product</button>
       </form>
 
@@ -61,5 +60,4 @@ function App() {
   );
 }
 
-const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(<App />);
+export default App; // ✅ default export

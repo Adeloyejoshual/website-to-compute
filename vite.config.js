@@ -1,16 +1,15 @@
 import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
 
-// https://vitejs.dev/config/
-export default defineConfig(async ({ command, mode }) => {
-  return {
-    build: {
-      outDir: "deploy/_site",
-      rollupOptions: {
-        input: {
-          main: 'index.html',
-          404: '404.html',
-        },
-      }
-    }
+export default defineConfig({
+  plugins: [react()],
+  root: "src/frontend",
+  build: {
+    outDir: "../../dist",
+    emptyOutDir: true
+  },
+  server: {
+    port: 5173
   }
 });

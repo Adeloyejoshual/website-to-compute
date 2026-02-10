@@ -2,12 +2,11 @@
   "name": "minimart",
   "version": "1.0.0",
   "private": true,
-  "description": "MiniMart single project with backend + frontend",
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "nodemon src/backend/index.js",
-    "dev:frontend": "cd src/frontend && npm install && vite",
-    "build": "cd src/frontend && npm install && vite build",
+    "dev:frontend": "cd src/frontend && npx vite",
+    "build": "cd src/frontend && npx vite build",
     "start": "node src/backend/index.js"
   },
   "dependencies": {

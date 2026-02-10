@@ -1,14 +1,8 @@
-import React from "react";
-import ProductForm from "./components/ProductForm";
-import ProductList from "./components/ProductList";
-
 export default function App() {
   return (
-    <div style={{ padding: "20px", fontFamily: "Arial, sans-serif" }}>
+    <div style={{ padding: 20 }}>
       <h1>MiniMart</h1>
-      <ProductForm />
-      <hr style={{ margin: "20px 0" }} />
-      <ProductList />
+      <p>Add product and view products here</p>
     </div>
   );
 }

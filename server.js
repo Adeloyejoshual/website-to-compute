@@ -38,7 +38,9 @@ app.use(express.urlencoded({ extended: true }));
 // GET all products
 app.get("/api/products", async (req, res) => {
   try {
-    const { rows } = await pool.query("SELECT * FROM products ORDER BY created_at DESC");
+    const { rows } = await pool.query(
+      "SELECT id, title, description, price, created_at FROM products ORDER BY created_at DESC"
+    );
     res.json(rows);
   } catch (err) {
     console.error("GET /api/products error:", err);
@@ -60,10 +62,11 @@ app.post("/api/products", async (req, res) => {
       return res.status(400).json({ error: "Price must be a valid number" });
     }
 
+    // Map frontend 'name' to DB 'title'
     const query = `
-      INSERT INTO products (name, description, price)
+      INSERT INTO products (title, description, price)
       VALUES ($1, $2, $3)
-      RETURNING *
+      RETURNING id, title, description, price, created_at
     `;
     const { rows } = await pool.query(query, [name.trim(), description?.trim() || null, numericPrice]);
     res.status(201).json(rows[0]);

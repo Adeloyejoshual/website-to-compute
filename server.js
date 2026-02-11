@@ -1,5 +1,7 @@
 import express from "express";
 import cors from "cors";
+import path from "path";
+import { fileURLToPath } from "url";
 import { pool } from "./db.js";
 import dotenv from "dotenv";
 
@@ -11,9 +13,8 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// --- API endpoints ---
+// --- API routes ---
 
-// Get all products
 app.get("/api/products", async (req, res) => {
   try {
     const { rows } = await pool.query("SELECT * FROM products ORDER BY id DESC");
@@ -24,7 +25,6 @@ app.get("/api/products", async (req, res) => {
   }
 });
 
-// Add a product
 app.post("/api/products", async (req, res) => {
   const { name, description, price } = req.body;
   try {
@@ -39,18 +39,20 @@ app.post("/api/products", async (req, res) => {
   }
 });
 
-// Optional: get categories
-app.get("/api/categories", async (req, res) => {
-  try {
-    const { rows } = await pool.query("SELECT * FROM categories");
-    res.json(rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Server error");
-  }
+// --- Serve frontend ---
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Serve Vite build folder
+app.use(express.static(path.join(__dirname, "dist")));
+
+// Redirect all non-API requests to index.html
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "dist", "index.html"));
 });
 
 // --- Start server ---
 app.listen(PORT, () => {
-  console.log(`🚀 MiniMart API running on port ${PORT}`);
+  console.log(`🚀 MiniMart running on port ${PORT}`);
 });

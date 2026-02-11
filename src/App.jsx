@@ -6,13 +6,12 @@ export default function App() {
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState({ name: "", description: "", price: "" });
 
-  // Fetch products
   const fetchProducts = async () => {
     try {
       const res = await axios.get("/api/products");
       setProducts(res.data);
     } catch (err) {
-      console.error("Error fetching products:", err);
+      console.error(err);
     }
   };
 
@@ -20,12 +19,8 @@ export default function App() {
     fetchProducts();
   }, []);
 
-  // Handle input change
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
+  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
-  // Handle add product
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -37,7 +32,7 @@ export default function App() {
       setProducts([res.data, ...products]);
       setForm({ name: "", description: "", price: "" });
     } catch (err) {
-      console.error("Error adding product:", err.response?.data || err.message);
+      console.error(err);
       alert(err.response?.data || err.message);
     }
   };
@@ -47,33 +42,9 @@ export default function App() {
       <h1>MiniMart</h1>
 
       <form onSubmit={handleSubmit} style={{ marginBottom: "2rem" }}>
-        <input
-          type="text"
-          name="name"
-          placeholder="Product Name"
-          value={form.name}
-          onChange={handleChange}
-          required
-          style={{ marginRight: "0.5rem" }}
-        />
-        <input
-          type="text"
-          name="description"
-          placeholder="Description"
-          value={form.description}
-          onChange={handleChange}
-          style={{ marginRight: "0.5rem" }}
-        />
-        <input
-          type="number"
-          step="0.01"
-          name="price"
-          placeholder="Price"
-          value={form.price}
-          onChange={handleChange}
-          required
-          style={{ marginRight: "0.5rem" }}
-        />
+        <input type="text" name="name" placeholder="Product Name" value={form.name} onChange={handleChange} required />
+        <input type="text" name="description" placeholder="Description" value={form.description} onChange={handleChange} />
+        <input type="number" step="0.01" name="price" placeholder="Price" value={form.price} onChange={handleChange} required />
         <button type="submit">Add Product</button>
       </form>
 

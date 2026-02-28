@@ -32,26 +32,40 @@ export default function App() {
     fetchProducts()
   }, [])
 
-  // Upload image to Cloudinary
-  const uploadImage = async () => {
+  // Upload image to Cloudinary and save to Supabase
+  const uploadImageAndSave = async (productId) => {
     if (!file) return
     const formData = new FormData()
     formData.append("file", file)
-    formData.append("upload_preset", import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET)
+    formData.append(
+      "upload_preset",
+      import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
+    )
 
     const res = await fetch(
       `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/upload`,
       { method: "POST", body: formData }
     )
-
     const data = await res.json()
-    setImageUrl(data.secure_url)
+    const url = data.secure_url
+
+    const { error } = await supabase.from("product_images").insert([
+      {
+        product_id: productId,
+        image_url: url,
+        is_primary: true,
+      },
+    ])
+    if (error) console.error("Error saving image:", error)
+    else setImageUrl(url)
   }
 
-  // Add new product
-  const addProduct = async () => {
+  // Add Product + Image
+  const addProductWithImage = async () => {
     if (!newProductName || !selectedSellerId || !newProductPrice) return
-    const { data, error } = await supabase
+
+    // 1️⃣ Insert product
+    const { data: productData, error: productError } = await supabase
       .from("products")
       .insert([
         {
@@ -64,15 +78,25 @@ export default function App() {
           created_at: new Date(),
         },
       ])
-    if (error) {
-      console.error("Insert product error:", error)
-    } else {
-      setProducts([...products, ...data])
-      setNewProductName("")
-      setNewProductPrice("")
-      setNewProductDescription("")
-      setSelectedSellerId(null)
+      .select()
+
+    if (productError) {
+      console.error("Insert product error:", productError)
+      return
     }
+
+    const productId = productData[0].id
+
+    // 2️⃣ Upload image and link
+    await uploadImageAndSave(productId)
+
+    // 3️⃣ Update state
+    setProducts([...products, productData[0]])
+    setNewProductName("")
+    setNewProductPrice("")
+    setNewProductDescription("")
+    setSelectedSellerId(null)
+    setFile(null)
   }
 
   return (
@@ -109,7 +133,9 @@ export default function App() {
         value={selectedSellerId || ""}
         onChange={(e) => setSelectedSellerId(parseInt(e.target.value))}
       >
-        <option value="" disabled>Select Seller</option>
+        <option value="" disabled>
+          Select Seller
+        </option>
         {users.map((u) => (
           <option key={u.id} value={u.id}>
             {u.name} ({u.seller_type})
@@ -120,7 +146,7 @@ export default function App() {
       <div>
         <h3>Upload Product Image</h3>
         <input type="file" onChange={(e) => setFile(e.target.files[0])} />
-        <button onClick={uploadImage}>Upload Image</button>
+        <button onClick={addProductWithImage}>Add Product</button>
         {imageUrl && (
           <div>
             <p>Uploaded Image:</p>
@@ -128,8 +154,6 @@ export default function App() {
           </div>
         )}
       </div>
-
-      <button onClick={addProduct}>Add Product</button>
     </div>
   )
 }

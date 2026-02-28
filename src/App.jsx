@@ -1,96 +1,59 @@
-import React, { useState, useEffect } from "react";
-import Products from "./pages/Products.jsx";
-import axios from "axios";
+import { useEffect, useState } from "react"
+import { supabase } from "./lib/supabase"
 
 export default function App() {
-  const [products, setProducts] = useState([]);
-  const [form, setForm] = useState({ name: "", description: "", price: "" });
-  const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState([])
+  const [error, setError] = useState(null)
+  const [file, setFile] = useState(null)
+  const [imageUrl, setImageUrl] = useState("")
 
-  // Fetch products from backend
-  const fetchProducts = async () => {
-    try {
-      const res = await axios.get("/api/products");
-      setProducts(res.data);
-    } catch (err) {
-      console.error("Error fetching products:", err);
-    }
-  };
-
+  // Fetch users (Supabase test)
   useEffect(() => {
-    fetchProducts();
-  }, []);
-
-  // Handle form input changes
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
-
-  // Handle form submit
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    // Validate price
-    const numericPrice = parseFloat(form.price);
-    if (isNaN(numericPrice)) {
-      return alert("Price must be a valid number");
+    const fetchUsers = async () => {
+      const { data, error } = await supabase.from("users").select("*")
+      if (error) setError(error.message)
+      else setUsers(data)
     }
+    fetchUsers()
+  }, [])
 
-    setLoading(true);
+  // Upload image to Cloudinary
+  const uploadImage = async () => {
+    if (!file) return
+    const formData = new FormData()
+    formData.append("file", file)
+    formData.append("upload_preset", import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET)
 
-    try {
-      const res = await axios.post("/api/products", {
-        name: form.name.trim(),
-        description: form.description.trim(),
-        price: numericPrice,
-      });
+    const res = await fetch(
+      `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/upload`,
+      {
+        method: "POST",
+        body: formData,
+      }
+    )
 
-      // Add new product to state
-      setProducts([res.data, ...products]);
-
-      // Reset form
-      setForm({ name: "", description: "", price: "" });
-    } catch (err) {
-      console.error("Error adding product:", err);
-      alert(err.response?.data?.error || err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const data = await res.json()
+    setImageUrl(data.secure_url)
+  }
 
   return (
-    <div style={{ padding: "2rem", fontFamily: "Arial" }}>
-      <h1>MiniMart</h1>
+    <div style={{ padding: "2rem" }}>
+      <h1>Marketplace Starter</h1>
 
-      <form onSubmit={handleSubmit} style={{ marginBottom: "2rem", display: "flex", flexDirection: "column", gap: "0.5rem", maxWidth: "400px" }}>
-        <input
-          type="text"
-          name="name"
-          placeholder="Product Name"
-          value={form.name}
-          onChange={handleChange}
-          required
-        />
-        <input
-          type="text"
-          name="description"
-          placeholder="Description"
-          value={form.description}
-          onChange={handleChange}
-        />
-        <input
-          type="number"
-          step="0.01"
-          name="price"
-          placeholder="Price"
-          value={form.price}
-          onChange={handleChange}
-          required
-        />
-        <button type="submit" disabled={loading}>
-          {loading ? "Adding..." : "Add Product"}
-        </button>
-      </form>
+      <h2>Users:</h2>
+      {error && <p style={{ color: "red" }}>Error: {error}</p>}
+      <pre>{JSON.stringify(users, null, 2)}</pre>
 
-      <Products products={products} />
+      <h2>Upload Product Image:</h2>
+      <input type="file" onChange={(e) => setFile(e.target.files[0])} />
+      <button onClick={uploadImage}>Upload</button>
+
+      {imageUrl && (
+        <div>
+          <p>Uploaded Image:</p>
+          <img src={imageUrl} alt="Uploaded" width={200} />
+        </div>
+      )}
     </div>
-  );
+  )
 }

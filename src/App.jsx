@@ -4,6 +4,7 @@ import { supabase } from "./lib/supabase"
 export default function App() {
   const [users, setUsers] = useState([])
   const [products, setProducts] = useState([])
+  const [error, setError] = useState(null)
   const [file, setFile] = useState(null)
 
   const [newProductName, setNewProductName] = useState("")
@@ -14,31 +15,66 @@ export default function App() {
   // Fetch users
   useEffect(() => {
     const fetchUsers = async () => {
-      const { data } = await supabase.from("users").select("*")
-      setUsers(data || [])
+      const { data, error } = await supabase.from("users").select("*")
+      if (error) setError(error.message)
+      else setUsers(data)
     }
     fetchUsers()
   }, [])
 
   // Fetch products
   useEffect(() => {
+    const fetchProducts = async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select(`
+          *,
+          product_images:product_images(image_url, is_primary)
+        `) // include linked images
+      if (error) console.error("Products error:", error)
+      else setProducts(data)
+    }
     fetchProducts()
   }, [])
 
-  const fetchProducts = async () => {
-    const { data } = await supabase.from("products").select("*")
-    setProducts(data || [])
+  // Upload image to Cloudinary and save in Supabase
+  const uploadImageAndSave = async (productId) => {
+    if (!file) return null
+
+    const formData = new FormData()
+    formData.append("file", file)
+    formData.append(
+      "upload_preset",
+      import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
+    )
+
+    const res = await fetch(
+      `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/upload`,
+      { method: "POST", body: formData }
+    )
+    const data = await res.json()
+    const imageUrl = data.secure_url
+
+    // Save to product_images table
+    const { error } = await supabase.from("product_images").insert([
+      {
+        product_id: productId,
+        image_url: imageUrl,
+        is_primary: true,
+      },
+    ])
+    if (error) console.error("Error saving image:", error)
+
+    return imageUrl
   }
 
-  const addProduct = async () => {
-    if (!newProductName || !newProductPrice || !selectedSellerId) {
-      console.warn("Please fill all required fields and select a seller.")
-      return
-    }
+  // Add product + upload image
+  const addProductWithImage = async () => {
+    if (!newProductName || !newProductPrice || !selectedSellerId) return
 
     try {
       // 1️⃣ Insert product
-      const { data: productData, error: insertError } = await supabase
+      const { data: productData, error: productError } = await supabase
         .from("products")
         .insert([
           {
@@ -53,69 +89,34 @@ export default function App() {
         ])
         .select()
 
-      if (insertError) throw insertError
+      if (productError) throw productError
       const productId = productData[0].id
-      console.log("Inserted product:", productData[0])
 
-      let uploadedImageUrl = ""
-
-      // 2️⃣ Upload image to Cloudinary
+      // 2️⃣ Upload image if file selected
+      let uploadedImageUrl = null
       if (file) {
-        const formData = new FormData()
-        formData.append("file", file)
-        formData.append(
-          "upload_preset",
-          import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
-        )
-
-        const cloudinaryRes = await fetch(
-          `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/upload`,
-          { method: "POST", body: formData }
-        )
-
-        const cloudinaryData = await cloudinaryRes.json()
-        console.log("Cloudinary upload response:", cloudinaryData)
-
-        if (!cloudinaryData.secure_url) {
-          console.error("Cloudinary upload failed, secure_url missing")
-        } else {
-          uploadedImageUrl = cloudinaryData.secure_url
-
-          // 3️⃣ Update product with primary_image_url
-          const { error: updateError } = await supabase
-            .from("products")
-            .update({ primary_image_url: uploadedImageUrl })
-            .eq("id", productId)
-
-          if (updateError) console.error("Error updating product with image:", updateError)
-          else console.log("Updated product with image URL:", uploadedImageUrl)
-
-          // 4️⃣ Insert into product_images table
-          const { error: imageTableError } = await supabase
-            .from("product_images")
-            .insert([
-              {
-                product_id: productId,
-                image_url: uploadedImageUrl,
-                is_primary: true,
-              },
-            ])
-          if (imageTableError) console.error("Error inserting into product_images:", imageTableError)
-        }
+        uploadedImageUrl = await uploadImageAndSave(productId)
       }
 
-      // 5️⃣ Refresh products in UI
-      fetchProducts()
+      // 3️⃣ Update products state
+      setProducts([
+        ...products,
+        {
+          ...productData[0],
+          product_images: uploadedImageUrl
+            ? [{ image_url: uploadedImageUrl, is_primary: true }]
+            : [],
+        },
+      ])
 
-      // 6️⃣ Reset form
+      // 4️⃣ Reset form
       setNewProductName("")
       setNewProductPrice("")
       setNewProductDescription("")
       setSelectedSellerId(null)
       setFile(null)
-
     } catch (err) {
-      console.error("Add product failed:", err)
+      console.error("Add product error:", err)
     }
   }
 
@@ -123,56 +124,53 @@ export default function App() {
     <div style={{ padding: "2rem" }}>
       <h1>Marketplace Starter</h1>
 
-      <h2>Users</h2>
+      <h2>Users:</h2>
+      {error && <p style={{ color: "red" }}>{error}</p>}
       <pre>{JSON.stringify(users, null, 2)}</pre>
 
-      <h2>Products</h2>
+      <h2>Products:</h2>
       {products.map((p) => (
-        <div key={p.id} style={{ marginBottom: "1.5rem" }}>
-          <strong>{p.name}</strong> - ₦{p.price}
-          <p>{p.description}</p>
-
-          {p.primary_image_url && (
+        <div key={p.id} style={{ marginBottom: "1rem" }}>
+          <strong>{p.name}</strong> - ${p.price} <br />
+          {p.description} <br />
+          Seller ID: {p.seller_id} <br />
+          {p.product_images?.length > 0 && (
             <img
-              src={p.primary_image_url}
+              src={p.product_images[0].image_url}
               alt={p.name}
               width={150}
               style={{ marginTop: "0.5rem" }}
             />
           )}
-
-          <hr />
         </div>
       ))}
 
       <h2>Add New Product</h2>
-
       <input
         type="text"
         placeholder="Product Name"
         value={newProductName}
         onChange={(e) => setNewProductName(e.target.value)}
       />
-
       <input
         type="number"
         placeholder="Price"
         value={newProductPrice}
         onChange={(e) => setNewProductPrice(e.target.value)}
       />
-
       <input
         type="text"
         placeholder="Description"
         value={newProductDescription}
         onChange={(e) => setNewProductDescription(e.target.value)}
       />
-
       <select
         value={selectedSellerId || ""}
         onChange={(e) => setSelectedSellerId(parseInt(e.target.value))}
       >
-        <option value="" disabled>Select Seller</option>
+        <option value="" disabled>
+          Select Seller
+        </option>
         {users.map((u) => (
           <option key={u.id} value={u.id}>
             {u.name} ({u.seller_type})
@@ -180,17 +178,12 @@ export default function App() {
         ))}
       </select>
 
-      <div style={{ marginTop: "1rem" }}>
-        <input
-          type="file"
-          onChange={(e) => setFile(e.target.files[0])}
-        />
+      <div>
+        <h3>Upload Product Image</h3>
+        <input type="file" onChange={(e) => setFile(e.target.files[0])} />
       </div>
 
-      <button
-        onClick={addProduct}
-        style={{ marginTop: "1rem" }}
-      >
+      <button onClick={addProductWithImage} style={{ marginTop: "1rem" }}>
         Add Product
       </button>
     </div>

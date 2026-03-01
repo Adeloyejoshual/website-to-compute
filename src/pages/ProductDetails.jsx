@@ -1,36 +1,40 @@
-import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-import { supabase } from "../config/supabaseClient";
+import { useParams } from "react-router-dom"
+import { useEffect, useState } from "react"
+import { supabase } from "../lib/supabase"
 
-function ProductDetails() {
-  const { id } = useParams();
-  const [product, setProduct] = useState(null);
+export default function ProductDetails() {
+  const { id } = useParams()
+  const [product, setProduct] = useState(null)
 
   useEffect(() => {
-    fetchProduct();
-  }, [id]);
-
-  const fetchProduct = async () => {
-    const { data, error } = await supabase
+    supabase
       .from("products")
       .select("*")
       .eq("id", id)
-      .single();
+      .single()
+      .then(({ data }) => setProduct(data))
+  }, [id])
 
-    if (error) console.error(error);
-    else setProduct(data);
-  };
+  const payWithPaystack = () => {
+    const handler = window.PaystackPop.setup({
+      key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
+      email: "customer@email.com",
+      amount: product.price * 100,
+      currency: "NGN",
+      callback: function () {
+        alert("Payment successful")
+      },
+    })
+    handler.openIframe()
+  }
 
-  if (!product) return <div>Loading...</div>;
+  if (!product) return <p>Loading...</p>
 
   return (
     <div>
-      <h1>{product.name}</h1>
-      <p>{product.description}</p>
-      <p>Price: ₦{product.price}</p>
-      <p>Seller Type: {product.seller_type}</p>
+      <h2>{product.name}</h2>
+      <p>₦{product.price}</p>
+      <button onClick={payWithPaystack}>Buy Now</button>
     </div>
-  );
+  )
 }
-
-export default ProductDetails;

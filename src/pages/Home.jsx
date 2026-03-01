@@ -6,60 +6,55 @@ const Home = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch all products
+  // Fetch products from Supabase
+  const fetchProducts = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("products")
+      .select("id, name, description, price, brand, model, created_at, is_public")
+      .order("created_at", { ascending: false })
+      .eq("is_public", true);
+
+    if (error) {
+      console.error("Error fetching products:", error.message);
+    } else {
+      setProducts(data);
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
-    const fetchProducts = async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select(`
-          id,
-          name,
-          description,
-          price,
-          seller_id,
-          seller_type,
-          brand,
-          image_url
-        `)
-        .eq("is_public", true)
-        .order("created_at", { ascending: false });
-
-      if (error) console.log(error);
-      else setProducts(data);
-
-      setLoading(false);
-    };
-
     fetchProducts();
   }, []);
 
-  if (loading) return <p>Loading products...</p>;
-
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Marketplace</h1>
-      {products.length === 0 && <p>No products available yet.</p>}
+    <div>
+      <h1 className="text-2xl font-bold mb-6">Marketplace Products</h1>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-        {products.map(product => (
-          <div
-            key={product.id}
-            className="border rounded-lg p-4 shadow hover:shadow-lg transition"
-          >
-            {product.image_url && (
-              <img
-                src={product.image_url}
-                alt={product.name}
-                className="w-full h-48 object-cover rounded"
-              />
-            )}
-            <h2 className="text-lg font-semibold mt-2">{product.name}</h2>
-            {product.brand && <p className="text-sm">Brand: {product.brand}</p>}
-            <p className="text-sm">{product.seller_type} Seller</p>
-            <p className="text-blue-600 font-bold mt-1">₦{product.price}</p>
-          </div>
-        ))}
-      </div>
+      {loading ? (
+        <p>Loading products...</p>
+      ) : products.length === 0 ? (
+        <p>No products found.</p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {products.map((product) => (
+            <div key={product.id} className="card">
+              <div className="h-48 bg-gray-100 rounded-md mb-4 flex items-center justify-center text-gray-400">
+                {/* Placeholder image */}
+                No Image
+              </div>
+              <h2 className="font-semibold text-lg mb-1">{product.name}</h2>
+              {product.brand && <p className="text-gray-500 text-sm">{product.brand}</p>}
+              {product.model && <p className="text-gray-500 text-sm">{product.model}</p>}
+              <p className="text-gray-700 mt-2">{product.description}</p>
+              <p className="mt-2 font-bold">₦{product.price}</p>
+              <p className="text-gray-400 text-xs mt-1">
+                Posted on {new Date(product.created_at).toLocaleDateString()}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

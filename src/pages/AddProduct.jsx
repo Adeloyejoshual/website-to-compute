@@ -1,167 +1,192 @@
-import React, { useState } from "react";
-import { supabase } from "../config/supabaseClient";
-import axios from "axios";
-import { categoryFields } from "../config/categoryFields";
+import { useState } from "react"
+import { supabase } from "../lib/supabase.js"
+import { categoryFields } from "../config/categoryFields.js"
 
-export default function AddProduct({ categories, sellers, refreshProducts }) {
-  const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    price: "",
-    seller_id: "",
-    category_id: "",
-    is_public: true,
-  });
-  const [dynamicFields, setDynamicFields] = useState({});
-  const [imageFile, setImageFile] = useState(null);
-  const [loading, setLoading] = useState(false);
+export default function AddProduct({ session }) {
+  const [name, setName] = useState("")
+  const [price, setPrice] = useState("")
+  const [description, setDescription] = useState("")
+  const [category, setCategory] = useState("")
+  const [file, setFile] = useState(null)
+  const [dynamicData, setDynamicData] = useState({})
+  const [loading, setLoading] = useState(false)
 
-  // Handle category change
-  const handleCategoryChange = (catId, catName) => {
-    setFormData({ ...formData, category_id: catId });
-    const fields = categoryFields[catName] || [];
-    const newDynamic = {};
-    fields.forEach((f) => (newDynamic[f] = ""));
-    setDynamicFields(newDynamic);
-  };
+  if (!session) {
+    return <p style={{ padding: 20 }}>Please login to add product.</p>
+  }
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-  };
+  const handleCategoryChange = (value) => {
+    setCategory(value)
 
-  const handleDynamicChange = (e) => {
-    const { name, value } = e.target;
-    setDynamicFields({ ...dynamicFields, [name]: value });
-  };
+    const fields = categoryFields[value] || []
+    const newFields = {}
 
-  const handleImageChange = (e) => {
-    setImageFile(e.target.files[0]);
-  };
+    fields.forEach((field) => {
+      newFields[field] = ""
+    })
 
-  const uploadImage = async () => {
-    if (!imageFile) return null;
+    setDynamicData(newFields)
+  }
 
-    const form = new FormData();
-    form.append("file", imageFile);
-    form.append("upload_preset", import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
+  const handleDynamicChange = (field, value) => {
+    setDynamicData({
+      ...dynamicData,
+      [field]: value,
+    })
+  }
 
-    const res = await axios.post(import.meta.env.VITE_CLOUDINARY_URL, form);
-    return res.data.secure_url;
-  };
+  const uploadToCloudinary = async () => {
+    if (!file) return null
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+    const formData = new FormData()
+    formData.append("file", file)
+    formData.append(
+      "upload_preset",
+      import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
+    )
 
-    let image_url = null;
-    if (imageFile) {
-      image_url = await uploadImage();
-    }
-
-    const { data, error } = await supabase
-      .from("products")
-      .insert([{ ...formData, ...dynamicFields }]);
-
-    if (error) {
-      console.error(error);
-      alert("Failed to add product.");
-    } else {
-      if (image_url) {
-        await supabase.from("product_images").insert([
-          { product_id: data[0].id, image_url, is_primary: true },
-        ]);
+    const res = await fetch(
+      `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/upload`,
+      {
+        method: "POST",
+        body: formData,
       }
-      alert("Product added!");
-      setFormData({
-        name: "",
-        description: "",
-        price: "",
-        seller_id: "",
-        category_id: "",
-        is_public: true,
-      });
-      setDynamicFields({});
-      setImageFile(null);
-      if (refreshProducts) refreshProducts();
+    )
+
+    if (!res.ok) throw new Error("Image upload failed")
+
+    const data = await res.json()
+    return data.secure_url
+  }
+
+  const handleSubmit = async () => {
+    if (!name || !price || !category) {
+      alert("Please fill all required fields")
+      return
     }
-    setLoading(false);
-  };
+
+    try {
+      setLoading(true)
+
+      // 1️⃣ Insert product
+      const { data: productData, error } = await supabase
+        .from("products")
+        .insert([
+          {
+            name,
+            price: parseFloat(price),
+            description,
+            category,
+            seller_id: session.user.id,
+            is_public: true,
+            ...dynamicData,
+          },
+        ])
+        .select()
+
+      if (error) throw error
+
+      const productId = productData[0].id
+
+      // 2️⃣ Upload image
+      if (file) {
+        const imageUrl = await uploadToCloudinary()
+
+        await supabase.from("product_images").insert([
+          {
+            product_id: productId,
+            image_url: imageUrl,
+            is_primary: true,
+          },
+        ])
+      }
+
+      alert("Product added successfully!")
+
+      // Reset form
+      setName("")
+      setPrice("")
+      setDescription("")
+      setCategory("")
+      setDynamicData({})
+      setFile(null)
+    } catch (err) {
+      console.error(err)
+      alert("Something went wrong")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <h2>Add New Product</h2>
+    <div style={{ padding: "2rem", maxWidth: 600 }}>
+      <h2>Add Product</h2>
 
       <input
         type="text"
-        name="name"
         placeholder="Product Name"
-        value={formData.name}
-        onChange={handleChange}
-        required
+        value={name}
+        onChange={(e) => setName(e.target.value)}
       />
+
+      <br /><br />
+
       <input
         type="number"
-        name="price"
-        placeholder="Price"
-        value={formData.price}
-        onChange={handleChange}
-        required
+        placeholder="Price (₦)"
+        value={price}
+        onChange={(e) => setPrice(e.target.value)}
       />
+
+      <br /><br />
+
       <textarea
-        name="description"
         placeholder="Description"
-        value={formData.description}
-        onChange={handleChange}
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
       />
 
-      <select
-        name="seller_id"
-        value={formData.seller_id}
-        onChange={handleChange}
-        required
-      >
-        <option value="">Select Seller</option>
-        {sellers.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.name} ({s.seller_type})
-          </option>
-        ))}
-      </select>
+      <br /><br />
 
       <select
-        name="category_id"
-        value={formData.category_id}
-        onChange={(e) => {
-          const selected = categories.find((c) => c.id == e.target.value);
-          handleCategoryChange(selected.id, selected.name);
-        }}
-        required
+        value={category}
+        onChange={(e) => handleCategoryChange(e.target.value)}
       >
         <option value="">Select Category</option>
-        {categories.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
+        {Object.keys(categoryFields).map((cat) => (
+          <option key={cat} value={cat}>
+            {cat}
           </option>
         ))}
       </select>
 
+      <br /><br />
+
       {/* Dynamic Fields */}
-      {Object.keys(dynamicFields).map((field) => (
-        <input
-          key={field}
-          type="text"
-          name={field}
-          placeholder={field.replace("_", " ")}
-          value={dynamicFields[field]}
-          onChange={handleDynamicChange}
-        />
+      {Object.keys(dynamicData).map((field) => (
+        <div key={field}>
+          <input
+            type="text"
+            placeholder={field}
+            value={dynamicData[field]}
+            onChange={(e) =>
+              handleDynamicChange(field, e.target.value)
+            }
+          />
+          <br /><br />
+        </div>
       ))}
 
-      <input type="file" onChange={handleImageChange} />
-      <button type="submit" disabled={loading}>
+      <input
+        type="file"
+        onChange={(e) => setFile(e.target.files[0])}
+      />
+
+      <br /><br />
+
+      <button onClick={handleSubmit} disabled={loading}>
         {loading ? "Adding..." : "Add Product"}
       </button>
-    </form>
-  );
+    </div>
+  )
 }

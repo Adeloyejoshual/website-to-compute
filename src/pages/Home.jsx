@@ -1,62 +1,87 @@
-// src/pages/Home.jsx
 import React, { useEffect, useState } from "react";
-import { supabase } from "../supabaseClient";
+import { supabase } from "../config/supabaseClient";
 
-const Home = () => {
+export default function Home() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch products from Supabase
   const fetchProducts = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+
+    // Fetch products with images
+    const { data: productsData, error } = await supabase
       .from("products")
-      .select("id, name, description, price, brand, model, created_at, is_public")
-      .order("created_at", { ascending: false })
-      .eq("is_public", true);
+      .select(`*, product_images(*)`);
 
     if (error) {
-      console.error("Error fetching products:", error.message);
+      console.error("Error fetching products:", error);
     } else {
-      setProducts(data);
+      setProducts(productsData);
     }
     setLoading(false);
   };
 
   useEffect(() => {
     fetchProducts();
+
+    // Optionally: realtime subscription to products table
+    const subscription = supabase
+      .channel("public:products")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "products" },
+        (payload) => {
+          console.log("Change received!", payload);
+          fetchProducts(); // refresh on any change
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
   }, []);
+
+  if (loading) return <div>Loading products...</div>;
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Marketplace Products</h1>
+      <h1>Marketplace Products</h1>
+      {products.length === 0 && <p>No products found.</p>}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "20px" }}>
+        {products.map((p) => (
+          <div key={p.id} style={{ border: "1px solid #ccc", padding: "10px" }}>
+            {/* Show main product image if exists */}
+            {p.product_images?.length > 0 && (
+              <img
+                src={p.product_images[0].image_url}
+                alt={p.name}
+                style={{ width: "100%", height: "200px", objectFit: "cover" }}
+              />
+            )}
+            <h3>{p.name}</h3>
+            <p>Price: ₦{p.price}</p>
+            <p>Seller: {p.seller_id} ({p.seller_type})</p>
 
-      {loading ? (
-        <p>Loading products...</p>
-      ) : products.length === 0 ? (
-        <p>No products found.</p>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {products.map((product) => (
-            <div key={product.id} className="card">
-              <div className="h-48 bg-gray-100 rounded-md mb-4 flex items-center justify-center text-gray-400">
-                {/* Placeholder image */}
-                No Image
-              </div>
-              <h2 className="font-semibold text-lg mb-1">{product.name}</h2>
-              {product.brand && <p className="text-gray-500 text-sm">{product.brand}</p>}
-              {product.model && <p className="text-gray-500 text-sm">{product.model}</p>}
-              <p className="text-gray-700 mt-2">{product.description}</p>
-              <p className="mt-2 font-bold">₦{product.price}</p>
-              <p className="text-gray-400 text-xs mt-1">
-                Posted on {new Date(product.created_at).toLocaleDateString()}
-              </p>
+            {/* Dynamic fields */}
+            <div>
+              {Object.entries(p)
+                .filter(
+                  ([key, value]) =>
+                    !["id", "created_at", "name", "description", "price", "seller_id", "category_id", "is_public", "seller_type", "product_images"].includes(key) &&
+                    value
+                )
+                .map(([key, value]) => (
+                  <p key={key}>
+                    <strong>{key.replace("_", " ")}:</strong> {value}
+                  </p>
+                ))}
             </div>
-          ))}
-        </div>
-      )}
+
+            <p>{p.description}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
-};
-
-export default Home;
+}

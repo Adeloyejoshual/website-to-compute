@@ -30,13 +30,15 @@ export default function App() {
     setProducts(data || [])
   }
 
-  // Add product + upload image
   const addProduct = async () => {
-    if (!newProductName || !newProductPrice || !selectedSellerId) return
+    if (!newProductName || !newProductPrice || !selectedSellerId) {
+      console.warn("Please fill all required fields and select a seller.")
+      return
+    }
 
     try {
       // 1️⃣ Insert product
-      const { data: productData, error } = await supabase
+      const { data: productData, error: insertError } = await supabase
         .from("products")
         .insert([
           {
@@ -51,12 +53,13 @@ export default function App() {
         ])
         .select()
 
-      if (error) throw error
-
+      if (insertError) throw insertError
       const productId = productData[0].id
-      let uploadedImageUrl = null
+      console.log("Inserted product:", productData[0])
 
-      // 2️⃣ Upload image if selected
+      let uploadedImageUrl = ""
+
+      // 2️⃣ Upload image to Cloudinary
       if (file) {
         const formData = new FormData()
         formData.append("file", file)
@@ -65,28 +68,46 @@ export default function App() {
           import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
         )
 
-        const res = await fetch(
+        const cloudinaryRes = await fetch(
           `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/upload`,
-          {
-            method: "POST",
-            body: formData,
-          }
+          { method: "POST", body: formData }
         )
 
-        const imgData = await res.json()
-        uploadedImageUrl = imgData.secure_url
+        const cloudinaryData = await cloudinaryRes.json()
+        console.log("Cloudinary upload response:", cloudinaryData)
 
-        // 3️⃣ Update product with primary image
-        await supabase
-          .from("products")
-          .update({ primary_image_url: uploadedImageUrl })
-          .eq("id", productId)
+        if (!cloudinaryData.secure_url) {
+          console.error("Cloudinary upload failed, secure_url missing")
+        } else {
+          uploadedImageUrl = cloudinaryData.secure_url
+
+          // 3️⃣ Update product with primary_image_url
+          const { error: updateError } = await supabase
+            .from("products")
+            .update({ primary_image_url: uploadedImageUrl })
+            .eq("id", productId)
+
+          if (updateError) console.error("Error updating product with image:", updateError)
+          else console.log("Updated product with image URL:", uploadedImageUrl)
+
+          // 4️⃣ Insert into product_images table
+          const { error: imageTableError } = await supabase
+            .from("product_images")
+            .insert([
+              {
+                product_id: productId,
+                image_url: uploadedImageUrl,
+                is_primary: true,
+              },
+            ])
+          if (imageTableError) console.error("Error inserting into product_images:", imageTableError)
+        }
       }
 
-      // Refresh product list
-      await fetchProducts()
+      // 5️⃣ Refresh products in UI
+      fetchProducts()
 
-      // Reset form
+      // 6️⃣ Reset form
       setNewProductName("")
       setNewProductPrice("")
       setNewProductDescription("")
@@ -94,7 +115,7 @@ export default function App() {
       setFile(null)
 
     } catch (err) {
-      console.error("Error adding product:", err)
+      console.error("Add product failed:", err)
     }
   }
 

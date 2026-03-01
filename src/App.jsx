@@ -1,27 +1,39 @@
-import React from "react";
-import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom"
+import { useEffect, useState } from "react"
+import { supabase } from "./lib/supabase"
 
-import Home from "./pages/Home";
-import AddProduct from "./pages/AddProduct";
+import Home from "./pages/Home"
+import AddProduct from "./pages/AddProduct"
+import ProductDetails from "./pages/ProductDetails"
+import Login from "./pages/Login"
+import Navbar from "./components/Navbar"
 
 export default function App() {
-  return (
-    <Router>
-      <div>
-        {/* Simple Navbar */}
-        <nav style={{ padding: "10px", borderBottom: "1px solid #ccc" }}>
-          <Link to="/" style={{ marginRight: "15px" }}>Home</Link>
-          <Link to="/add-product">Add Product</Link>
-        </nav>
+  const [session, setSession] = useState(null)
 
-        {/* Page Content */}
-        <div style={{ padding: "20px" }}>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/add-product" element={<AddProduct />} />
-          </Routes>
-        </div>
-      </div>
-    </Router>
-  );
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session)
+    })
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setSession(session)
+      }
+    )
+
+    return () => listener.subscription.unsubscribe()
+  }, [])
+
+  return (
+    <BrowserRouter>
+      <Navbar session={session} />
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/add" element={<AddProduct session={session} />} />
+        <Route path="/product/:id" element={<ProductDetails />} />
+        <Route path="/login" element={<Login />} />
+      </Routes>
+    </BrowserRouter>
+  )
 }

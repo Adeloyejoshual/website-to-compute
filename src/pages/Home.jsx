@@ -1,43 +1,32 @@
 import { useEffect, useState } from "react"
-import { supabase } from "../lib/supabase.js"
+import { supabase } from "../lib/supabase"
+import ProductCard from "../components/ProductCard"
+import SearchFilter from "../components/SearchFilter"
 
 export default function Home() {
   const [products, setProducts] = useState([])
+  const [search, setSearch] = useState("")
 
   useEffect(() => {
-    const fetchProducts = async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*, product_images(image_url)")
-
-      if (error) {
-        console.error(error)
-        return
-      }
-
-      setProducts(data || [])
-    }
-
     fetchProducts()
   }, [])
 
+  const fetchProducts = async () => {
+    const { data } = await supabase
+      .from("products")
+      .select(`*, product_images(image_url)`)
+    setProducts(data || [])
+  }
+
+  const filtered = products.filter((p) =>
+    p.name.toLowerCase().includes(search.toLowerCase())
+  )
+
   return (
-    <div style={{ padding: 20 }}>
-      <h2>Products</h2>
-
-      {products.map((p) => (
-        <div key={p.id} style={{ marginBottom: 20 }}>
-          <strong>{p.name}</strong>
-          <p>₦{p.price}</p>
-
-          {p.product_images?.[0] && (
-            <img
-              src={p.product_images[0].image_url}
-              width={150}
-              alt={p.name}
-            />
-          )}
-        </div>
+    <div>
+      <SearchFilter setSearch={setSearch} />
+      {filtered.map((p) => (
+        <ProductCard key={p.id} product={p} />
       ))}
     </div>
   )

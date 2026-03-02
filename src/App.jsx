@@ -2,21 +2,19 @@ import { BrowserRouter, Routes, Route } from "react-router-dom"
 import { useEffect, useState } from "react"
 import { supabase } from "./lib/supabase"
 
-import Home from "./pages/Home.jsx"
-import AddProduct from "./pages/AddProduct.jsx"
+import Home from "./pages/Home"
+import AddProduct from "./pages/AddProduct"
+import ProductDetails from "./pages/ProductDetails"
+import Login from "./pages/Login"
+import Navbar from "./components/Navbar"
 
 export default function App() {
   const [session, setSession] = useState(null)
-  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const getSession = async () => {
-      const { data } = await supabase.auth.getSession()
+    supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
-      setLoading(false)
-    }
-
-    getSession()
+    })
 
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
@@ -27,13 +25,14 @@ export default function App() {
     return () => listener.subscription.unsubscribe()
   }, [])
 
-  if (loading) return <p style={{ padding: 20 }}>Loading...</p>
-
   return (
     <BrowserRouter>
+      <Navbar session={session} />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/add" element={<AddProduct session={session} />} />
+        <Route path="/product/:id" element={<ProductDetails />} />
+        <Route path="/login" element={<Login />} />
       </Routes>
     </BrowserRouter>
   )

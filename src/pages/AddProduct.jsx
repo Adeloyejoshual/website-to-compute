@@ -12,29 +12,25 @@ export default function AddProduct({ session }) {
   const [loading, setLoading] = useState(false)
 
   if (!session) {
-    return <p style={{ padding: 20 }}>Please login to add product.</p>
+    return <p style={{ padding: 20 }}>Please login to add a product.</p>
   }
 
+  // Update dynamic fields when category changes
   const handleCategoryChange = (value) => {
     setCategory(value)
-
     const fields = categoryFields[value] || []
     const newFields = {}
-
     fields.forEach((field) => {
       newFields[field] = ""
     })
-
     setDynamicData(newFields)
   }
 
   const handleDynamicChange = (field, value) => {
-    setDynamicData({
-      ...dynamicData,
-      [field]: value,
-    })
+    setDynamicData({ ...dynamicData, [field]: value })
   }
 
+  // Upload image to Cloudinary
   const uploadToCloudinary = async () => {
     if (!file) return null
 
@@ -47,18 +43,15 @@ export default function AddProduct({ session }) {
 
     const res = await fetch(
       `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/upload`,
-      {
-        method: "POST",
-        body: formData,
-      }
+      { method: "POST", body: formData }
     )
 
     if (!res.ok) throw new Error("Image upload failed")
-
     const data = await res.json()
     return data.secure_url
   }
 
+  // Submit product
   const handleSubmit = async () => {
     if (!name || !price || !category) {
       alert("Please fill all required fields")
@@ -68,7 +61,7 @@ export default function AddProduct({ session }) {
     try {
       setLoading(true)
 
-      // 1️⃣ Insert product
+      // Insert into products
       const { data: productData, error } = await supabase
         .from("products")
         .insert([
@@ -77,7 +70,7 @@ export default function AddProduct({ session }) {
             price: parseFloat(price),
             description,
             category,
-            seller_id: session.user.id,
+            seller_auth_id: session.user.id, // important for RLS
             is_public: true,
             ...dynamicData,
           },
@@ -88,10 +81,9 @@ export default function AddProduct({ session }) {
 
       const productId = productData[0].id
 
-      // 2️⃣ Upload image
+      // Upload image if selected
       if (file) {
         const imageUrl = await uploadToCloudinary()
-
         await supabase.from("product_images").insert([
           {
             product_id: productId,
@@ -128,7 +120,6 @@ export default function AddProduct({ session }) {
         value={name}
         onChange={(e) => setName(e.target.value)}
       />
-
       <br /><br />
 
       <input
@@ -137,7 +128,6 @@ export default function AddProduct({ session }) {
         value={price}
         onChange={(e) => setPrice(e.target.value)}
       />
-
       <br /><br />
 
       <textarea
@@ -145,7 +135,6 @@ export default function AddProduct({ session }) {
         value={description}
         onChange={(e) => setDescription(e.target.value)}
       />
-
       <br /><br />
 
       <select
@@ -154,34 +143,25 @@ export default function AddProduct({ session }) {
       >
         <option value="">Select Category</option>
         {Object.keys(categoryFields).map((cat) => (
-          <option key={cat} value={cat}>
-            {cat}
-          </option>
+          <option key={cat} value={cat}>{cat}</option>
         ))}
       </select>
-
       <br /><br />
 
-      {/* Dynamic Fields */}
+      {/* Dynamic category fields */}
       {Object.keys(dynamicData).map((field) => (
         <div key={field}>
           <input
             type="text"
             placeholder={field}
             value={dynamicData[field]}
-            onChange={(e) =>
-              handleDynamicChange(field, e.target.value)
-            }
+            onChange={(e) => handleDynamicChange(field, e.target.value)}
           />
           <br /><br />
         </div>
       ))}
 
-      <input
-        type="file"
-        onChange={(e) => setFile(e.target.files[0])}
-      />
-
+      <input type="file" onChange={(e) => setFile(e.target.files[0])} />
       <br /><br />
 
       <button onClick={handleSubmit} disabled={loading}>

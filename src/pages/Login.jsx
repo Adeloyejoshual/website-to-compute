@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 
@@ -6,7 +6,16 @@ export default function AuthForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate(); // hook for navigation
+  const navigate = useNavigate();
+
+  // Check if user is already logged in
+  useEffect(() => {
+    const session = supabase.auth.getSession().then(({ data }) => {
+      if (data.session) {
+        navigate("/"); // redirect to homepage
+      }
+    });
+  }, [navigate]);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -16,14 +25,10 @@ export default function AuthForm() {
 
     try {
       setLoading(true);
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
 
-      // Redirect to homepage after login
-      navigate("/"); 
+      navigate("/"); // redirect after login
     } catch (err) {
       alert(err.message);
     } finally {
@@ -39,16 +44,11 @@ export default function AuthForm() {
 
     try {
       setLoading(true);
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
+      const { error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
 
-      alert("Registration successful! Please check your email to confirm.");
-      
-      // Redirect to homepage after registration (optional: after email confirmation)
-      navigate("/"); 
+      alert("Registration successful! Check your email to confirm.");
+      navigate("/"); // redirect after registration
     } catch (err) {
       alert(err.message);
     } finally {

@@ -1,71 +1,67 @@
-import { useState } from "react";
-import { supabase } from "../lib/supabase";
+import { useState } from "react"
+import { supabase } from "../lib/supabase"
 
-export default function AddProduct({ session }) {
-  const [name, setName] = useState("");
-  const [price, setPrice] = useState("");
-  const [description, setDescription] = useState("");
-  const [loading, setLoading] = useState(false);
+export default function AddProduct() {
+const [name, setName] = useState("")
+const [price, setPrice] = useState("")
+const [description, setDescription] = useState("")
 
-  if (!session) return <p>Please login to add a product.</p>;
+const addProduct = async () => {
+const {
+data: { user },
+} = await supabase.auth.getUser()
 
-  const handleSubmit = async () => {
-    if (!name || !price) {
-      alert("Please enter name and price");
-      return;
-    }
+if (!user) {
+  alert("You must login first")
+  return
+}
 
-    try {
-      setLoading(true);
-      const { data, error } = await supabase.from("products").insert([
-        {
-          name,
-          price: parseFloat(price),
-          description,
-          seller_id: session.user.id,
-          is_public: true,
-        },
-      ]);
-      if (error) throw error;
+const { error } = await supabase.from("products").insert([
+  {
+    name: name,
+    price: price,
+    description: description,
+    seller_id: user.id
+  }
+])
 
-      alert("Product added!");
-      setName("");
-      setPrice("");
-      setDescription("");
-    } catch (err) {
-      console.error(err);
-      alert("Error adding product");
-    } finally {
-      setLoading(false);
-    }
-  };
+if (error) {
+  alert("Error adding product")
+  console.log(error)
+} else {
+  alert("Product added successfully")
+  setName("")
+  setPrice("")
+  setDescription("")
+}
 
-  return (
-    <div style={{ padding: 20, maxWidth: 400 }}>
-      <h2>Add Product</h2>
-      <input
-        type="text"
-        placeholder="Name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-      />
-      <br /><br />
-      <input
-        type="number"
-        placeholder="Price"
-        value={price}
-        onChange={(e) => setPrice(e.target.value)}
-      />
-      <br /><br />
-      <textarea
-        placeholder="Description"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-      />
-      <br /><br />
-      <button onClick={handleSubmit} disabled={loading}>
-        {loading ? "Adding..." : "Add Product"}
-      </button>
-    </div>
-  );
+}
+
+return (
+<div>
+<h2>Add Product</h2>
+
+  <input
+    placeholder="Product name"
+    value={name}
+    onChange={(e) => setName(e.target.value)}
+  />
+
+  <input
+    placeholder="Price"
+    type="number"
+    value={price}
+    onChange={(e) => setPrice(e.target.value)}
+  />
+
+  <textarea
+    placeholder="Description"
+    value={description}
+    onChange={(e) => setDescription(e.target.value)}
+  />
+
+  <button onClick={addProduct}>Add Product</button>
+</div>
+
+)
 }

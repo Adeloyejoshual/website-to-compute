@@ -1,24 +1,48 @@
-const register = async () => {
-const { data, error } = await supabase.auth.signUp({
+import { useState } from "react"
+import { supabase } from "../lib/supabase"
+
+export default function Login() {
+const [email, setEmail] = useState("")
+const [password, setPassword] = useState("")
+
+const login = async () => {
+const { error } = await supabase.auth.signInWithPassword({
 email,
-password,
+password
 })
 
-if (error) {
-alert(error.message)
-return
+if (error) alert(error.message)
+
 }
 
-const user = data.user
+const register = async () => {
+const { error } = await supabase.auth.signUp({
+email,
+password
+})
 
-if (user) {
-await supabase.from("users").insert([
-{
-auth_id: user.id,
-email: user.email
-}
-])
+if (error) alert(error.message)
+
 }
 
-alert("Account created")
+return (
+<div>
+<h2>Login / Register</h2>
+
+  <input
+    placeholder="Email"
+    onChange={(e) => setEmail(e.target.value)}
+  />
+
+  <input
+    type="password"
+    placeholder="Password"
+    onChange={(e) => setPassword(e.target.value)}
+  />
+
+  <button onClick={login}>Login</button>
+  <button onClick={register}>Register</button>
+</div>
+
+)
 }

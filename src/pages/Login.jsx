@@ -1,92 +1,24 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "../lib/supabase";
+const register = async () => {
+const { data, error } = await supabase.auth.signUp({
+email,
+password,
+})
 
-export default function AuthForm() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
+if (error) {
+alert(error.message)
+return
+}
 
-  // Check if user is already logged in
-  useEffect(() => {
-    const session = supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
-        navigate("/"); // redirect to homepage
-      }
-    });
-  }, [navigate]);
+const user = data.user
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      alert("Please enter email and password");
-      return;
-    }
+if (user) {
+await supabase.from("users").insert([
+{
+auth_id: user.id,
+email: user.email
+}
+])
+}
 
-    try {
-      setLoading(true);
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-
-      navigate("/"); // redirect after login
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRegister = async () => {
-    if (!email || !password) {
-      alert("Please enter email and password");
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const { error } = await supabase.auth.signUp({ email, password });
-      if (error) throw error;
-
-      alert("Registration successful! Check your email to confirm.");
-      navigate("/"); // redirect after registration
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div style={{ maxWidth: 400, margin: "2rem auto", padding: "1rem", border: "1px solid #ddd", borderRadius: 8 }}>
-      <h2 style={{ textAlign: "center" }}>Login / Register</h2>
-      <input
-        type="email"
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        style={{ width: "100%", padding: "0.5rem", marginBottom: "0.5rem" }}
-      />
-      <input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        style={{ width: "100%", padding: "0.5rem", marginBottom: "1rem" }}
-      />
-      <button
-        onClick={handleLogin}
-        disabled={loading}
-        style={{ width: "48%", padding: "0.5rem", marginRight: "4%", cursor: "pointer" }}
-      >
-        {loading ? "Loading..." : "Login"}
-      </button>
-      <button
-        onClick={handleRegister}
-        disabled={loading}
-        style={{ width: "48%", padding: "0.5rem", cursor: "pointer" }}
-      >
-        {loading ? "Loading..." : "Register"}
-      </button>
-    </div>
-  );
+alert("Account created")
 }

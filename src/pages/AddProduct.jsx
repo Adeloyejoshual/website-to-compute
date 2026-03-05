@@ -1,68 +1,86 @@
 import { useState } from "react"
 import { supabase } from "../lib/supabase"
 
-export default function AddProduct() {
-const [name, setName] = useState("")
-const [price, setPrice] = useState("")
-const [description, setDescription] = useState("")
+export default function AddProduct({ session }) {
 
-const addProduct = async () => {
-const { data: { user } } = await supabase.auth.getUser()
+  const [name, setName] = useState("")
+  const [price, setPrice] = useState("")
+  const [description, setDescription] = useState("")
+  const [loading, setLoading] = useState(false)
 
-if (!user) {
-  alert("You must login first")
-  return
-}
+  const addProduct = async () => {
 
-const { data, error } = await supabase
-  .from("products")
-  .insert([
-    {
-      name: name,
-      price: price,
-      description: description,
-      seller_id: user.id
+    if (!session) {
+      alert("Login first")
+      return
     }
-  ])
 
-if (error) {
-  alert(error.message)
-  console.log("Supabase error:", error)
-  return
-}
+    if (!name || !price) {
+      alert("Product name and price required")
+      return
+    }
 
-alert("Product added successfully")
-setName("")
-setPrice("")
-setDescription("")
+    setLoading(true)
 
-}
+    const { error } = await supabase
+      .from("products")
+      .insert([
+        {
+          name: name,
+          description: description,
+          price: price,
+          seller_id: session.user.id,
+          marketplace_type: "africa"
+        }
+      ])
 
-return (
-<div>
-<h2>Add Product</h2>
+    if (error) {
+      alert(error.message)
+      console.log(error)
+    } else {
+      alert("Product added successfully")
+      setName("")
+      setPrice("")
+      setDescription("")
+    }
 
-  <input
-    placeholder="Product name"
-    value={name}
-    onChange={(e) => setName(e.target.value)}
-  />
+    setLoading(false)
+  }
 
-  <input
-    placeholder="Price"
-    type="number"
-    value={price}
-    onChange={(e) => setPrice(e.target.value)}
-  />
+  return (
+    <div style={{ maxWidth: 500, margin: "50px auto" }}>
+      <h2>Add Product</h2>
 
-  <textarea
-    placeholder="Description"
-    value={description}
-    onChange={(e) => setDescription(e.target.value)}
-  />
+      <input
+        type="text"
+        placeholder="Product name"
+        value={name}
+        onChange={(e)=>setName(e.target.value)}
+        style={{ width:"100%", padding:10, marginBottom:10 }}
+      />
 
-  <button onClick={addProduct}>Add Product</button>
-</div>
+      <input
+        type="number"
+        placeholder="Price"
+        value={price}
+        onChange={(e)=>setPrice(e.target.value)}
+        style={{ width:"100%", padding:10, marginBottom:10 }}
+      />
 
-)
+      <textarea
+        placeholder="Description"
+        value={description}
+        onChange={(e)=>setDescription(e.target.value)}
+        style={{ width:"100%", padding:10, marginBottom:10 }}
+      />
+
+      <button
+        onClick={addProduct}
+        disabled={loading}
+        style={{ width:"100%", padding:12 }}
+      >
+        Add Product
+      </button>
+    </div>
+  )
 }

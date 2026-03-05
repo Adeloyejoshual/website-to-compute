@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { supabase } from "../lib/supabase"
 
-export default function AddProduct({ session }) {
+export default function AddProduct() {
 
   const [name, setName] = useState("")
   const [price, setPrice] = useState("")
@@ -10,13 +10,11 @@ export default function AddProduct({ session }) {
 
   const addProduct = async () => {
 
-    if (!session) {
-      alert("Login first")
-      return
-    }
+    const { data: userData } = await supabase.auth.getUser()
+    const user = userData.user
 
-    if (!name || !price) {
-      alert("Product name and price required")
+    if (!user) {
+      alert("Please login first")
       return
     }
 
@@ -29,7 +27,7 @@ export default function AddProduct({ session }) {
           name: name,
           description: description,
           price: price,
-          seller_id: session.user.id,
+          seller_id: user.id,   // IMPORTANT
           marketplace_type: "africa"
         }
       ])
@@ -48,15 +46,14 @@ export default function AddProduct({ session }) {
   }
 
   return (
-    <div style={{ maxWidth: 500, margin: "50px auto" }}>
+    <div style={{maxWidth:500, margin:"50px auto"}}>
+
       <h2>Add Product</h2>
 
       <input
-        type="text"
         placeholder="Product name"
         value={name}
         onChange={(e)=>setName(e.target.value)}
-        style={{ width:"100%", padding:10, marginBottom:10 }}
       />
 
       <input
@@ -64,23 +61,18 @@ export default function AddProduct({ session }) {
         placeholder="Price"
         value={price}
         onChange={(e)=>setPrice(e.target.value)}
-        style={{ width:"100%", padding:10, marginBottom:10 }}
       />
 
       <textarea
         placeholder="Description"
         value={description}
         onChange={(e)=>setDescription(e.target.value)}
-        style={{ width:"100%", padding:10, marginBottom:10 }}
       />
 
-      <button
-        onClick={addProduct}
-        disabled={loading}
-        style={{ width:"100%", padding:12 }}
-      >
+      <button onClick={addProduct} disabled={loading}>
         Add Product
       </button>
+
     </div>
   )
 }

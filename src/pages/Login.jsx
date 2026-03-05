@@ -4,13 +4,15 @@ import { supabase } from "../lib/supabase"
 export default function Login() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [loading, setLoading] = useState(false)
 
-  // REGISTER
   const register = async () => {
     if (!email || !password) {
       alert("Enter email and password")
       return
     }
+
+    setLoading(true)
 
     const { data, error } = await supabase.auth.signUp({
       email: email,
@@ -19,26 +21,36 @@ export default function Login() {
 
     if (error) {
       alert(error.message)
+      setLoading(false)
       return
     }
 
-    // create user record in users table
-    await supabase.from("users").insert([
-      {
-        auth_id: data.user.id,
-        email: data.user.email
-      }
-    ])
+    if (data?.user) {
+      const { error: dbError } = await supabase.from("users").insert([
+        {
+          auth_id: data.user.id,
+          email: data.user.email,
+          full_name: "",
+          is_seller: false
+        }
+      ])
 
-    alert("Account created successfully")
+      if (dbError) {
+        console.log(dbError)
+      }
+    }
+
+    alert("Check your email to confirm your account")
+    setLoading(false)
   }
 
-  // LOGIN
   const login = async () => {
     if (!email || !password) {
       alert("Enter email and password")
       return
     }
+
+    setLoading(true)
 
     const { error } = await supabase.auth.signInWithPassword({
       email: email,
@@ -47,36 +59,44 @@ export default function Login() {
 
     if (error) {
       alert(error.message)
-      return
     }
 
-    alert("Login successful")
+    setLoading(false)
   }
 
   return (
-    <div style={{ padding: 20 }}>
+    <div style={{ maxWidth: 400, margin: "50px auto" }}>
       <h2>Login / Register</h2>
 
       <input
+        type="email"
         placeholder="Email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
+        style={{ width: "100%", padding: 10, marginBottom: 10 }}
       />
-
-      <br /><br />
 
       <input
         type="password"
         placeholder="Password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
+        style={{ width: "100%", padding: 10, marginBottom: 10 }}
       />
 
-      <br /><br />
+      <button
+        onClick={login}
+        disabled={loading}
+        style={{ width: "100%", padding: 10, marginBottom: 10 }}
+      >
+        Login
+      </button>
 
-      <button onClick={login}>Login</button>
-
-      <button onClick={register} style={{ marginLeft: 10 }}>
+      <button
+        onClick={register}
+        disabled={loading}
+        style={{ width: "100%", padding: 10 }}
+      >
         Register
       </button>
     </div>

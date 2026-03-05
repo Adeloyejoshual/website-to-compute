@@ -12,25 +12,32 @@ export default function App() {
   const [session, setSession] = useState(null)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    const getSession = async () => {
+      const { data } = await supabase.auth.getSession()
       setSession(data.session)
-    })
+    }
 
-    const { data: listener } = supabase.auth.onAuthStateChange(
+    getSession()
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setSession(session)
       }
     )
 
-    return () => listener.subscription.unsubscribe()
+    return () => authListener.subscription.unsubscribe()
   }, [])
 
   return (
     <BrowserRouter>
       <Navbar session={session} />
+
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/add" element={<AddProduct session={session} />} />
+        <Route
+          path="/add"
+          element={session ? <AddProduct session={session} /> : <Login />}
+        />
         <Route path="/product/:id" element={<ProductDetails />} />
         <Route path="/login" element={<Login />} />
       </Routes>

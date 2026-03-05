@@ -12,32 +12,34 @@ export default function AddProduct() {
   useEffect(() => {
     const fetchUser = async () => {
       const { data } = await supabase.auth.getUser()
-      if (!data.user) {
+      const loggedUser = data?.user
+
+      if (!loggedUser) {
         alert("Please login first")
         return
       }
 
-      setUser(data.user)
+      setUser(loggedUser)
 
-      // Make sure user exists in public.users
-      const { data: dbUser, error } = await supabase
+      // Ensure user exists in public.users table
+      const { data: dbUser } = await supabase
         .from("users")
         .select("*")
-        .eq("auth_id", data.user.id)
+        .eq("auth_id", loggedUser.id)
         .single()
 
       if (!dbUser) {
-        // Insert user record if not exists
-        const { error: insertError } = await supabase.from("users").insert([
+        // Insert user if not exists
+        const { error } = await supabase.from("users").insert([
           {
-            auth_id: data.user.id,
-            email: data.user.email,
-            full_name: "",
-            phone: "",
-            is_seller: true // or false depending on your logic
+            auth_id: loggedUser.id,
+            email: loggedUser.email,
+            full_name: loggedUser.user_metadata?.full_name || "",
+            phone: loggedUser.user_metadata?.phone || "",
+            is_seller: true
           }
         ])
-        if (insertError) console.log("Error inserting user:", insertError)
+        if (error) console.log("Error inserting user:", error)
       }
     }
 
@@ -58,13 +60,13 @@ export default function AddProduct() {
         name,
         description,
         price,
-        seller_id: user.id, // Important! matches users.auth_id
-        marketplace_type: "africa"
+        seller_id: user.id,       // Must match users.auth_id
+        marketplace_type: "africa" // or "global" depending on your marketplace
       }
     ])
 
     if (error) {
-      alert(error.message)
+      alert("Error adding product: " + error.message)
       console.log(error)
     } else {
       alert("Product added successfully")

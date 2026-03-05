@@ -1,36 +1,67 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { supabase } from "../lib/supabase"
 
 export default function AddProduct() {
-
   const [name, setName] = useState("")
   const [price, setPrice] = useState("")
   const [description, setDescription] = useState("")
   const [loading, setLoading] = useState(false)
+  const [user, setUser] = useState(null)
+
+  // Get logged-in user
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data } = await supabase.auth.getUser()
+      if (!data.user) {
+        alert("Please login first")
+        return
+      }
+
+      setUser(data.user)
+
+      // Make sure user exists in public.users
+      const { data: dbUser, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("auth_id", data.user.id)
+        .single()
+
+      if (!dbUser) {
+        // Insert user record if not exists
+        const { error: insertError } = await supabase.from("users").insert([
+          {
+            auth_id: data.user.id,
+            email: data.user.email,
+            full_name: "",
+            phone: "",
+            is_seller: true // or false depending on your logic
+          }
+        ])
+        if (insertError) console.log("Error inserting user:", insertError)
+      }
+    }
+
+    fetchUser()
+  }, [])
 
   const addProduct = async () => {
-
-    const { data: userData } = await supabase.auth.getUser()
-    const user = userData.user
-
-    if (!user) {
-      alert("Please login first")
+    if (!user) return
+    if (!name || !price) {
+      alert("Product name and price are required")
       return
     }
 
     setLoading(true)
 
-    const { error } = await supabase
-      .from("products")
-      .insert([
-        {
-          name: name,
-          description: description,
-          price: price,
-          seller_id: user.id,   // IMPORTANT
-          marketplace_type: "africa"
-        }
-      ])
+    const { error } = await supabase.from("products").insert([
+      {
+        name,
+        description,
+        price,
+        seller_id: user.id, // Important! matches users.auth_id
+        marketplace_type: "africa"
+      }
+    ])
 
     if (error) {
       alert(error.message)
@@ -46,33 +77,39 @@ export default function AddProduct() {
   }
 
   return (
-    <div style={{maxWidth:500, margin:"50px auto"}}>
-
+    <div style={{ maxWidth: 500, margin: "50px auto" }}>
       <h2>Add Product</h2>
 
       <input
-        placeholder="Product name"
+        type="text"
+        placeholder="Product Name"
         value={name}
-        onChange={(e)=>setName(e.target.value)}
+        onChange={(e) => setName(e.target.value)}
+        style={{ width: "100%", padding: 10, marginBottom: 10 }}
       />
 
       <input
         type="number"
         placeholder="Price"
         value={price}
-        onChange={(e)=>setPrice(e.target.value)}
+        onChange={(e) => setPrice(e.target.value)}
+        style={{ width: "100%", padding: 10, marginBottom: 10 }}
       />
 
       <textarea
         placeholder="Description"
         value={description}
-        onChange={(e)=>setDescription(e.target.value)}
+        onChange={(e) => setDescription(e.target.value)}
+        style={{ width: "100%", padding: 10, marginBottom: 10 }}
       />
 
-      <button onClick={addProduct} disabled={loading}>
-        Add Product
+      <button
+        onClick={addProduct}
+        disabled={loading}
+        style={{ width: "100%", padding: 12 }}
+      >
+        {loading ? "Adding..." : "Add Product"}
       </button>
-
     </div>
   )
 }

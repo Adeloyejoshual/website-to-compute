@@ -2,47 +2,83 @@ import { useState } from "react"
 import { supabase } from "../lib/supabase"
 
 export default function Login() {
-const [email, setEmail] = useState("")
-const [password, setPassword] = useState("")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
 
-const login = async () => {
-const { error } = await supabase.auth.signInWithPassword({
-email,
-password
-})
+  // REGISTER
+  const register = async () => {
+    if (!email || !password) {
+      alert("Enter email and password")
+      return
+    }
 
-if (error) alert(error.message)
+    const { data, error } = await supabase.auth.signUp({
+      email: email,
+      password: password
+    })
 
-}
+    if (error) {
+      alert(error.message)
+      return
+    }
 
-const register = async () => {
-const { error } = await supabase.auth.signUp({
-email,
-password
-})
+    // create user record in users table
+    await supabase.from("users").insert([
+      {
+        auth_id: data.user.id,
+        email: data.user.email
+      }
+    ])
 
-if (error) alert(error.message)
+    alert("Account created successfully")
+  }
 
-}
+  // LOGIN
+  const login = async () => {
+    if (!email || !password) {
+      alert("Enter email and password")
+      return
+    }
 
-return (
-<div>
-<h2>Login / Register</h2>
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email,
+      password: password
+    })
 
-  <input
-    placeholder="Email"
-    onChange={(e) => setEmail(e.target.value)}
-  />
+    if (error) {
+      alert(error.message)
+      return
+    }
 
-  <input
-    type="password"
-    placeholder="Password"
-    onChange={(e) => setPassword(e.target.value)}
-  />
+    alert("Login successful")
+  }
 
-  <button onClick={login}>Login</button>
-  <button onClick={register}>Register</button>
-</div>
+  return (
+    <div style={{ padding: 20 }}>
+      <h2>Login / Register</h2>
 
-)
+      <input
+        placeholder="Email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+      />
+
+      <br /><br />
+
+      <input
+        type="password"
+        placeholder="Password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+      />
+
+      <br /><br />
+
+      <button onClick={login}>Login</button>
+
+      <button onClick={register} style={{ marginLeft: 10 }}>
+        Register
+      </button>
+    </div>
+  )
 }

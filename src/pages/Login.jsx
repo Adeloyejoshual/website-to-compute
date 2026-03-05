@@ -1,131 +1,73 @@
 import { useState } from "react"
 import { supabase } from "../lib/supabase"
 
-export default function Login() {
-
-  const [fullName, setFullName] = useState("")
-  const [phone, setPhone] = useState("")
+export default function Auth() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [loading, setLoading] = useState(false)
 
-  const register = async () => {
-
-    if (!fullName || !phone || !email || !password) {
-      alert("Please fill all fields")
-      return
-    }
-
-    setLoading(true)
-
+  const signUp = async () => {
     const { data, error } = await supabase.auth.signUp({
-      email: email,
-      password: password
+      email,
+      password,
     })
 
-    if (error) {
-      alert(error.message)
-      setLoading(false)
-      return
-    }
+    if (error) return alert("Signup error: " + error.message)
 
-    if (data?.user) {
-
-      const { error: dbError } = await supabase
-        .from("users")
-        .insert([
-          {
-            auth_id: data.user.id,
-            full_name: fullName,
-            email: email,
-            phone: phone,
-            is_seller: false
-          }
-        ])
-
-      if (dbError) {
-        console.log(dbError)
-        alert("Database error saving user")
-      }
-    }
-
-    alert("Check your email to confirm signup")
-    setLoading(false)
+    alert("Check your email to confirm your account!")
   }
 
-  const login = async () => {
-
-    if (!email || !password) {
-      alert("Enter email and password")
-      return
-    }
-
-    setLoading(true)
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email,
-      password: password
+  const signIn = async () => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
     })
 
-    if (error) {
-      alert(error.message)
+    if (error) return alert("Login error: " + error.message)
+
+    const user = data.user
+    if (!user) return
+
+    // Ensure user exists in public.users
+    const { data: dbUser } = await supabase
+      .from("users")
+      .select("*")
+      .eq("auth_id", user.id)
+      .single()
+
+    if (!dbUser) {
+      const { error: insertError } = await supabase.from("users").insert([
+        {
+          auth_id: user.id,
+          email: user.email,
+          full_name: "", // optionally ask user to fill this later
+          phone: "",
+          is_seller: true,
+          marketplace_type: "africa",
+        },
+      ])
+      if (insertError) console.log("Error inserting user:", insertError)
     }
 
-    setLoading(false)
+    alert("Login successful!")
   }
 
   return (
-    <div style={{ maxWidth: 420, margin: "60px auto" }}>
+    <div style={{ maxWidth: 400, margin: "50px auto" }}>
       <h2>Login / Register</h2>
-
-      <input
-        type="text"
-        placeholder="Full Name"
-        value={fullName}
-        onChange={(e) => setFullName(e.target.value)}
-        style={{ width: "100%", padding: 10, marginBottom: 10 }}
-      />
-
-      <input
-        type="text"
-        placeholder="Phone Number"
-        value={phone}
-        onChange={(e) => setPhone(e.target.value)}
-        style={{ width: "100%", padding: 10, marginBottom: 10 }}
-      />
-
       <input
         type="email"
         placeholder="Email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        style={{ width: "100%", padding: 10, marginBottom: 10 }}
       />
-
       <input
         type="password"
         placeholder="Password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        style={{ width: "100%", padding: 10, marginBottom: 20 }}
       />
-
-      <button
-        onClick={login}
-        disabled={loading}
-        style={{ width: "100%", padding: 12, marginBottom: 10 }}
-      >
-        Login
-      </button>
-
-      <button
-        onClick={register}
-        disabled={loading}
-        style={{ width: "100%", padding: 12 }}
-      >
-        Register
-      </button>
-
+      <button onClick={signUp}>Sign Up</button>
+      <button onClick={signIn}>Login</button>
     </div>
   )
 }

@@ -1,11 +1,12 @@
+// src/App.jsx - Fixed for pages/ structure
 import { BrowserRouter, Routes, Route } from "react-router-dom"
 import { useEffect, useState } from "react"
 import { supabase } from "./lib/supabase"
 
-import Home from "./Home"
-import AddProduct from "./AddProduct"
-import ProductDetails from "./ProductDetails"
-import Login from "./Login"
+import Home from "./pages/Home"
+import AddProduct from "./pages/AddProduct"
+import ProductDetails from "./pages/ProductDetails"
+import Login from "./pages/Login"
 import Navbar from "./components/Navbar"
 
 export default function App() {
@@ -40,6 +41,7 @@ export default function App() {
         />
         <Route path="/product/:id" element={<ProductDetails />} />
         <Route path="/login" element={<Login />} />
+        <Route path="*" element={<div>404 - Page Not Found</div>} />
       </Routes>
     </BrowserRouter>
   )

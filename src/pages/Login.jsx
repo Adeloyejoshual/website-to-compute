@@ -3,164 +3,156 @@ import { supabase } from "../lib/supabase"
 
 export default function Login() {
 
-  const [isRegister, setIsRegister] = useState(false)
+const [fullName,setFullName]=useState("")
+const [phone,setPhone]=useState("")
+const [email,setEmail]=useState("")
+const [password,setPassword]=useState("")
+const [error,setError]=useState("")
+const [loading,setLoading]=useState(false)
+const [isRegister,setIsRegister]=useState(false)
 
-  const [fullName, setFullName] = useState("")
-  const [phone, setPhone] = useState("")
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
+const validate = () => {
 
-  const [error, setError] = useState("")
-  const [loading, setLoading] = useState(false)
+if(!email || !password) return "Enter email and password"
 
+const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+.[A-Za-z]{2,}$/
 
-  const validate = () => {
+if(!emailRegex.test(email)) return "Invalid email"
 
-    setError("")
+if(password.length < 6) return "Password must be at least 6 characters"
 
-    if (!email || !password) {
-      return "Enter email and password"
-    }
+if(isRegister && (!fullName || !phone)) return "Fill all fields"
 
-    const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
+return null
+}
 
-    if (!emailRegex.test(email)) {
-      return "Valid email required"
-    }
+const register = async () => {
 
-    if (password.length < 6) {
-      return "Password must be at least 6 characters"
-    }
+const err = validate()
 
-    if (isRegister && (!fullName || !phone)) {
-      return "Fill all fields"
-    }
+if(err){
+setError(err)
+return
+}
 
-    return null
-  }
+setError("")
+setLoading(true)
 
+const { data, error } = await supabase.auth.signUp({
+email: email.trim().toLowerCase(),
+password: password.trim()
+})
 
-  const register = async () => {
+if(error){
+setError(error.message)
+setLoading(false)
+return
+}
 
-    const err = validate()
+const user = data?.user
 
-    if (err) {
-      setError(err)
-      return
-    }
+if(user){
 
-    setLoading(true)
+const { error: insertError } = await supabase
+.from("users")
+.insert([
+{
+auth_id: user.id,
+email: email.trim().toLowerCase(),
+full_name: fullName.trim(),
+phone: phone.trim()
+}
+])
 
-    const { error } = await supabase.auth.signUp({
-      email: email.trim().toLowerCase(),
-      password: password.trim(),
-      options: {
-        data: {
-          full_name: fullName.trim(),
-          phone: phone.trim()
-        }
-      }
-    })
+if(insertError){
+setError(insertError.message)
+setLoading(false)
+return
+}
 
-    setLoading(false)
+}
 
-    if (error) {
-      setError(error.message)
-      return
-    }
+setLoading(false)
 
-    alert("Account created. Check your email to confirm.")
-    setIsRegister(false)
-  }
+alert("Account created successfully. Please check your email.")
 
+setIsRegister(false)
 
-  const login = async () => {
+}
 
-    const err = validate()
+const login = async () => {
 
-    if (err) {
-      setError(err)
-      return
-    }
+const err = validate()
 
-    setLoading(true)
+if(err){
+setError(err)
+return
+}
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
-      password: password.trim()
-    })
+setError("")
+setLoading(true)
 
-    setLoading(false)
+const { error } = await supabase.auth.signInWithPassword({
+email: email.trim().toLowerCase(),
+password: password.trim()
+})
 
-    if (error) {
-      setError(error.message)
-    }
-  }
+setLoading(false)
 
+if(error){
+setError(error.message)
+}
 
-  return (
+}
 
-    <div style={{
-      maxWidth: "400px",
-      margin: "60px auto",
-      display: "flex",
-      flexDirection: "column",
-      gap: "10px"
-    }}>
+return (
 
-      <h2>{isRegister ? "Create Account" : "Login"}</h2>
+<div style={{maxWidth:400,margin:"60px auto"}}><h2>{isRegister ? "Create Account" : "Login"}</h2>{error && <p style={{color:"red"}}>{error}</p>}
 
-      {error && (
-        <p style={{ color: "red" }}>{error}</p>
-      )}
+{isRegister && (
+<>
+<input
+placeholder="Full Name"
+value={fullName}
+onChange={(e)=>setFullName(e.target.value)}
+/>
 
-      {isRegister && (
-        <>
-          <input
-            placeholder="Full Name"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-          />
+<input
+placeholder="Phone"
+value={phone}
+onChange={(e)=>setPhone(e.target.value)}
+/>
+</>
+)}
 
-          <input
-            placeholder="Phone"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-          />
-        </>
-      )}
+<input
+placeholder="Email"
+value={email}
+onChange={(e)=>setEmail(e.target.value)}
+/>
 
-      <input
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-      />
+<input
+type="password"
+placeholder="Password"
+value={password}
+onChange={(e)=>setPassword(e.target.value)}
+/>
 
-      <input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
+<button
+onClick={isRegister ? register : login}
+disabled={loading}
 
-      <button
-        onClick={isRegister ? register : login}
-        disabled={loading}
-      >
-        {loading ? "Loading..." : isRegister ? "Register" : "Login"}
-      </button>
+«»
 
-      <button
-        onClick={() => {
-          setIsRegister(!isRegister)
-          setError("")
-        }}
-      >
-        {isRegister
-          ? "Already have account? Login"
-          : "Create new account"}
-      </button>
+{loading ? "Loading..." : isRegister ? "Register" : "Login"}
 
-    </div>
-  )
+</button><button
+onClick={()=>setIsRegister(!isRegister)}
+
+«»
+
+{isRegister ? "Already have account? Login" : "Create new account"}
+
+</button></div>)
+
 }

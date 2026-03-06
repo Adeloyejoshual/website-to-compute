@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { supabase } from "../lib/supabase"
 
-export default function Login() {
+export default function Login(){
 
 const [fullName,setFullName]=useState("")
 const [phone,setPhone]=useState("")
@@ -11,56 +11,61 @@ const [error,setError]=useState("")
 const [loading,setLoading]=useState(false)
 const [isRegister,setIsRegister]=useState(false)
 
-const validate = () => {
+const validate=()=>{
 
 if(!email || !password) return "Enter email and password"
 
-const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+.[A-Za-z]{2,}$/
+const emailRegex=/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
 
 if(!emailRegex.test(email)) return "Invalid email"
 
-if(password.length < 6) return "Password must be at least 6 characters"
+if(password.length<6) return "Password must be at least 6 characters"
 
 if(isRegister && (!fullName || !phone)) return "Fill all fields"
 
 return null
 }
 
-const register = async () => {
+const register=async()=>{
 
-const err = validate()
+setError("")
+
+const err=validate()
 
 if(err){
 setError(err)
 return
 }
 
-setError("")
 setLoading(true)
 
-const { data, error } = await supabase.auth.signUp({
-email: email.trim().toLowerCase(),
-password: password.trim()
+const {data,error:signUpError}=await supabase.auth.signUp({
+email:email.trim().toLowerCase(),
+password:password.trim()
 })
 
-if(error){
-setError(error.message)
+if(signUpError){
+setError(signUpError.message)
 setLoading(false)
 return
 }
 
-const user = data?.user
+const user=data?.user
 
 if(user){
 
-const { error: insertError } = await supabase
+const {error:insertError}=await supabase
 .from("users")
 .insert([
 {
-auth_id: user.id,
-email: email.trim().toLowerCase(),
-full_name: fullName.trim(),
-phone: phone.trim()
+auth_id:user.id,
+email:email.trim().toLowerCase(),
+full_name:fullName.trim(),
+phone:phone.trim(),
+is_seller:false,
+seller_type:"public",
+marketplace_type:"africa",
+is_active:true
 }
 ])
 
@@ -74,27 +79,28 @@ return
 
 setLoading(false)
 
-alert("Account created successfully. Please check your email.")
+alert("Account created successfully. Check your email to confirm.")
 
 setIsRegister(false)
 
 }
 
-const login = async () => {
+const login=async()=>{
 
-const err = validate()
+setError("")
+
+const err=validate()
 
 if(err){
 setError(err)
 return
 }
 
-setError("")
 setLoading(true)
 
-const { error } = await supabase.auth.signInWithPassword({
-email: email.trim().toLowerCase(),
-password: password.trim()
+const {error}=await supabase.auth.signInWithPassword({
+email:email.trim().toLowerCase(),
+password:password.trim()
 })
 
 setLoading(false)
@@ -105,22 +111,26 @@ setError(error.message)
 
 }
 
-return (
+return(
 
-<div style={{maxWidth:400,margin:"60px auto"}}><h2>{isRegister ? "Create Account" : "Login"}</h2>{error && <p style={{color:"red"}}>{error}</p>}
+<div style={{maxWidth:400,margin:"60px auto"}}>
+
+<h2>{isRegister ? "Create Account" : "Login"}</h2>
+
+{error && <p style={{color:"red"}}>{error}</p>}
 
 {isRegister && (
 <>
 <input
 placeholder="Full Name"
 value={fullName}
-onChange={(e)=>setFullName(e.target.value)}
+onChange={e=>setFullName(e.target.value)}
 />
 
 <input
 placeholder="Phone"
 value={phone}
-onChange={(e)=>setPhone(e.target.value)}
+onChange={e=>setPhone(e.target.value)}
 />
 </>
 )}
@@ -128,31 +138,31 @@ onChange={(e)=>setPhone(e.target.value)}
 <input
 placeholder="Email"
 value={email}
-onChange={(e)=>setEmail(e.target.value)}
+onChange={e=>setEmail(e.target.value)}
 />
 
 <input
 type="password"
 placeholder="Password"
 value={password}
-onChange={(e)=>setPassword(e.target.value)}
+onChange={e=>setPassword(e.target.value)}
 />
 
 <button
 onClick={isRegister ? register : login}
 disabled={loading}
-
-«»
-
+>
 {loading ? "Loading..." : isRegister ? "Register" : "Login"}
+</button>
 
-</button><button
+<button
 onClick={()=>setIsRegister(!isRegister)}
-
-«»
-
+>
 {isRegister ? "Already have account? Login" : "Create new account"}
+</button>
 
-</button></div>)
+</div>
+
+)
 
 }

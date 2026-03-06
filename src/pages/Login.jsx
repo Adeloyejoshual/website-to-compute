@@ -1,7 +1,6 @@
-// src/pages/Login.jsx - PRODUCTION READY
+// src/pages/Login.jsx
 import { useState } from "react"
 import { supabase } from "../lib/supabase"
-import { useNavigate } from "react-router-dom"
 
 export default function Login() {
   const [fullName, setFullName] = useState("")
@@ -12,20 +11,24 @@ export default function Login() {
   const [error, setError] = useState("")
   const [isRegister, setIsRegister] = useState(false)
 
-  const navigate = useNavigate()
-
-  // ✅ Form validation
-  const validate = () => {
+  // Form validation
+  const validateForm = () => {
     if (!email || !password) return "Enter email and password"
+    if (isRegister && (!fullName.trim() || !phone.trim())) return "Fill all fields"
+
+    // Email regex
     const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
     if (!emailRegex.test(email)) return "Enter a valid email"
+
+    // Phone validation (7-15 digits)
+    if (isRegister && !/^[0-9]{7,15}$/.test(phone)) return "Enter valid phone number"
+
     if (password.length < 6) return "Password must be at least 6 characters"
-    if (isRegister && (!fullName.trim() || !phone.trim())) return "Full name and phone required"
-    if (isRegister && !/^[0-9]{7,15}$/.test(phone)) return "Enter a valid phone number (7-15 digits)"
+
     return null
   }
 
-  // ✅ Clear form
+  // Clear form and error
   const clearForm = () => {
     setFullName("")
     setPhone("")
@@ -34,22 +37,22 @@ export default function Login() {
     setError("")
   }
 
-  // ✅ Register user
+  // REGISTER USER
   const register = async () => {
-    const err = validate()
-    if (err) return setError(err)
+    const errMsg = validateForm()
+    if (errMsg) return setError(errMsg)
 
     setLoading(true)
     setError("")
 
-    // Sign up with Supabase Auth
-    const { data, error: authError } = await supabase.auth.signUp({
+    // 1️⃣ Sign up user with Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email: email.trim().toLowerCase(),
-      password: password.trim(),
+      password,
       options: {
         data: {
           full_name: fullName.trim(),
-          phone: phone.trim()
+          phone: phone.trim(),
         }
       }
     })
@@ -60,151 +63,83 @@ export default function Login() {
       return
     }
 
-    // ✅ Auto-create row in your users table
-    if (data?.user) {
-      const { error: dbError } = await supabase.from("users").insert([{
-        auth_id: data.user.id,
-        full_name: fullName.trim(),
-        phone: phone.trim(),
-        email: email.trim().toLowerCase(),
-        is_seller: false,
-        seller_type: "public",
-        marketplace_type: "buyer",
-        is_active: true,
-        kyc_status: "pending"
-      }])
+    // 2️⃣ Insert into users table manually
+    if (authData?.user?.id) {
+      const { error: dbError } = await supabase
+        .from("users")
+        .insert([{
+          auth_id: authData.user.id,
+          full_name: fullName.trim(),
+          phone: phone.trim(),
+          is_seller: false,
+          seller_type: "public",
+          marketplace_type: "africa",
+          email: email.trim().toLowerCase(),
+          is_active: true,
+          kyc_status: "pending",
+          created_at: new Date()
+        }])
 
       if (dbError) {
-        console.error(dbError)
-        setError("Failed to save profile in users table")
-      } else {
-        alert("✅ Account created! Check your email to confirm.")
-        setIsRegister(false)
-        clearForm()
+        console.error("DB Insert Error:", dbError)
+        setError("Registration failed: unable to save profile")
+        setLoading(false)
+        return
       }
     }
 
     setLoading(false)
+    alert("✅ Account created! Check your email to confirm.")
+    setIsRegister(false)
+    clearForm()
   }
 
-  // ✅ Login user
+  // LOGIN USER
   const login = async () => {
-    const err = validate()
-    if (err) return setError(err)
+    const errMsg = validateForm()
+    if (errMsg) return setError(errMsg)
 
     setLoading(true)
     setError("")
 
-    const { data, error: authError } = await supabase.auth.signInWithPassword({
+    const { error: authError } = await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
-      password: password.trim()
+      password
     })
 
     setLoading(false)
-
-    if (authError) {
-      setError(authError.message)
-    } else {
-      clearForm()
-      navigate("/") // Redirect to homepage after login
-    }
-  }
-
-  const toggleMode = () => {
-    setIsRegister(!isRegister)
-    clearForm()
-  }
-
-  // ✅ Handle input changes and clear errors on type
-  const handleChange = (setter) => (e) => {
-    setter(e.target.value)
-    setError("")
+    if (authError) setError(authError.message)
+    else clearForm()
   }
 
   return (
-    <div style={containerStyle}>
-      <h2 style={headerStyle}>{isRegister ? "Create Account" : "Welcome Back"}</h2>
+    <div style={{ maxWidth: 420, margin: "60px auto", padding: 30, border: "1px solid #e0e0e0", borderRadius: 12, boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}>
+      <h2 style={{ textAlign: "center", marginBottom: 24 }}>{isRegister ? "Register Account" : "Welcome Back"}</h2>
 
-      {error && <div style={errorStyle}>{error}</div>}
+      {error && <div style={{ color: "red", marginBottom: 16 }}>{error}</div>}
 
-      {isRegister && (
-        <>
-          <input
-            type="text"
-            placeholder="Full Name"
-            value={fullName}
-            onChange={handleChange(setFullName)}
-            style={inputStyle}
-          />
-          <input
-            type="tel"
-            placeholder="Phone Number"
-            value={phone}
-            onChange={handleChange(setPhone)}
-            style={inputStyle}
-          />
-        </>
-      )}
+      {isRegister && <>
+        <input placeholder="Full Name *" value={fullName} onChange={e => setFullName(e.target.value)} style={inputStyle} />
+        <input placeholder="Phone Number *" value={phone} onChange={e => setPhone(e.target.value)} style={inputStyle} />
+      </>}
 
-      <input
-        type="email"
-        placeholder="Email Address"
-        value={email}
-        onChange={handleChange(setEmail)}
-        style={inputStyle}
-      />
+      <input placeholder="Email *" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} />
+      <input type="password" placeholder="Password *" value={password} onChange={e => setPassword(e.target.value)} style={inputStyle} />
 
-      <input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={handleChange(setPassword)}
-        style={inputStyle}
-      />
-
-      <button
-        onClick={isRegister ? register : login}
-        disabled={loading}
-        style={{
-          ...buttonStyle,
-          background: isRegister ? "#10b981" : "#3b82f6",
-          color: "white",
-          marginBottom: 12
-        }}
-      >
-        {loading ? (isRegister ? "Creating..." : "Signing In...") : (isRegister ? "Register" : "Login")}
+      <button onClick={isRegister ? register : login} disabled={loading} style={buttonStyle}>
+        {loading ? "Loading..." : isRegister ? "Register" : "Login"}
       </button>
 
-      <button
-        onClick={toggleMode}
-        disabled={loading}
-        style={{ ...buttonStyle, background: "#f3f4f6", color: "#374151" }}
-      >
-        {isRegister ? "Already have account? Login" : "New here? Create Account"}
+      <button onClick={() => setIsRegister(!isRegister)} disabled={loading} style={{ ...buttonStyle, background: "#f3f4f6", color: "#374151" }}>
+        {isRegister ? "Already have an account? Login" : "New user? Register"}
       </button>
     </div>
   )
 }
 
-const containerStyle = {
-  maxWidth: 420,
-  margin: "60px auto",
-  padding: "30px",
-  border: "1px solid #e0e0e0",
-  borderRadius: 12,
-  boxShadow: "0 4px 20px rgba(0,0,0,0.08)"
-}
-
-const headerStyle = {
-  textAlign: "center",
-  marginBottom: 24,
-  color: "#333",
-  fontSize: 28
-}
-
 const inputStyle = {
   width: "100%",
-  padding: "14px 16px",
+  padding: 14,
   marginBottom: 16,
   border: "1px solid #d1d5db",
   borderRadius: 8,
@@ -214,20 +149,13 @@ const inputStyle = {
 
 const buttonStyle = {
   width: "100%",
-  padding: "14px 16px",
+  padding: 14,
+  marginBottom: 12,
   border: "1px solid #d1d5db",
   borderRadius: 8,
   fontSize: 16,
   fontWeight: 500,
   cursor: "pointer",
-  transition: "all 0.2s"
-}
-
-const errorStyle = {
-  background: "#fee2e2",
-  color: "#dc2626",
-  padding: "12px",
-  borderRadius: 8,
-  marginBottom: 16,
-  borderLeft: "4px solid #dc2626"
+  background: "#3b82f6",
+  color: "white"
 }

@@ -10,13 +10,13 @@ export default function Home() {
   const [loadingMini, setLoadingMini] = useState(true);
   const [loadingMarket, setLoadingMarket] = useState(true);
 
-  // Debounce search
+  // Debounce search input
   useEffect(() => {
     const timeout = setTimeout(() => setDebouncedSearch(searchTerm), 300);
     return () => clearTimeout(timeout);
   }, [searchTerm]);
 
-  // Fetch MiniMart
+  // Fetch MiniMart products
   useEffect(() => {
     const fetchMiniMart = async () => {
       setLoadingMini(true);
@@ -39,7 +39,7 @@ export default function Home() {
     fetchMiniMart();
   }, []);
 
-  // Fetch Marketplace
+  // Fetch Marketplace products
   useEffect(() => {
     const fetchMarketplace = async () => {
       setLoadingMarket(true);
@@ -62,11 +62,9 @@ export default function Home() {
     fetchMarketplace();
   }, []);
 
-  // Filter products by search
   const filterProducts = (products) =>
-    products.filter(
-      (p) =>
-        p.title.toLowerCase().includes(debouncedSearch.toLowerCase())
+    products.filter((p) =>
+      p.title.toLowerCase().includes(debouncedSearch.toLowerCase())
     );
 
   const filteredMiniMart = filterProducts(miniMartProducts);
@@ -133,23 +131,25 @@ function MiniMartCard({ product }) {
 
   useEffect(() => {
     if (!product.flash_sale_end) return;
-    const updateTimer = () => {
+    const interval = setInterval(() => {
       const now = new Date();
       const end = new Date(product.flash_sale_end);
       const diff = end - now;
-      if (diff <= 0) return setTimeLeft("Sale Ended");
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      const minutes = Math.floor((diff / (1000 * 60)) % 60);
-      const seconds = Math.floor((diff / 1000) % 60);
-      setTimeLeft(`${hours}h ${minutes}m ${seconds}s`);
-    };
-    const interval = setInterval(updateTimer, 1000);
-    updateTimer();
+      if (diff <= 0) {
+        setTimeLeft("Sale Ended");
+        clearInterval(interval);
+        return;
+      }
+      const h = Math.floor(diff / (1000 * 60 * 60));
+      const m = Math.floor((diff / (1000 * 60)) % 60);
+      const s = Math.floor((diff / 1000) % 60);
+      setTimeLeft(`${h}h ${m}m ${s}s`);
+    }, 1000);
     return () => clearInterval(interval);
   }, [product.flash_sale_end]);
 
   return (
-    <div className="product-card minimart-card">
+    <div className="product-card minimart-card hover-shadow">
       <div className="product-image">
         {firstImage ? <img src={firstImage} alt={product.title} /> : <div className="image-placeholder">📦</div>}
       </div>
@@ -172,7 +172,7 @@ function MarketplaceCard({ product }) {
   const title = product.title.length > 50 ? product.title.slice(0, 50) + "..." : product.title;
 
   return (
-    <div className="product-card marketplace-card">
+    <div className="product-card marketplace-card hover-shadow">
       <div className="product-image">
         {firstImage ? <img src={firstImage} alt={product.title} /> : <div className="image-placeholder">🏪</div>}
       </div>

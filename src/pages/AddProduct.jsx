@@ -5,14 +5,14 @@ const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
 export default function AddProduct() {
-  const [userId, setUserId] = useState(null); // seller_id from logged-in user
+  const [userId, setUserId] = useState(null);
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [image, setImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  // Get current user on mount
+  // Get logged-in user
   useEffect(() => {
     const fetchUser = async () => {
       const {
@@ -23,7 +23,7 @@ export default function AddProduct() {
     fetchUser();
   }, []);
 
-  // Cloudinary upload
+  // Upload image to Cloudinary
   const uploadImage = async () => {
     if (!image) return null;
 
@@ -42,6 +42,7 @@ export default function AddProduct() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     if (!userId) {
       setMessage("❌ Please log in first.");
       return;
@@ -51,7 +52,7 @@ export default function AddProduct() {
     setMessage("");
 
     try {
-      // 1️⃣ Insert product with seller_id
+      // 1️⃣ Insert product
       const { data: product, error } = await supabase
         .from("products")
         .insert([
@@ -66,22 +67,22 @@ export default function AddProduct() {
 
       if (error) throw error;
 
-      // 2️⃣ Upload image to Cloudinary
-      const imageUrl = await uploadImage();
-
-      // 3️⃣ Save image in product_images table
-      if (imageUrl) {
-        const { error: imgError } = await supabase
-          .from("product_images")
-          .insert([
-            {
-              product_id: product.id,
-              image_url: imageUrl,
-              is_primary: true,
-              position: 1,
-            },
-          ]);
-        if (imgError) throw imgError;
+      // 2️⃣ Upload image (optional)
+      if (image) {
+        const imageUrl = await uploadImage();
+        if (imageUrl) {
+          const { error: imgError } = await supabase
+            .from("product_images")
+            .insert([
+              {
+                product_id: product.id,
+                image_url: imageUrl,
+                is_primary: true,
+                position: 1,
+              },
+            ]);
+          if (imgError) throw imgError;
+        }
       }
 
       setMessage("✅ Product added successfully!");

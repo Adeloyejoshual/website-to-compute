@@ -1,4 +1,3 @@
-// src/pages/Home.jsx
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import "./Home.css";
@@ -17,16 +16,16 @@ export default function Home() {
     return () => clearTimeout(timeout);
   }, [searchTerm]);
 
-  // Fetch MiniMart products
+  // ===== Fetch MiniMart products =====
   useEffect(() => {
     const fetchMiniMart = async () => {
       setLoadingMini(true);
       try {
         const { data, error } = await supabase
           .from("products")
-          .select("id, title, price, discount_price, flash_sale_end, images")
+          .select("id, name, title, price, discount_price, flash_sale_end, images")
           .eq("status", "active")
-          .eq("marketplace_type", "minimart")
+          .eq("marketplace_type", "minimart") // Use marketplace_type
           .order("created_at", { ascending: false })
           .limit(12);
 
@@ -41,16 +40,16 @@ export default function Home() {
     fetchMiniMart();
   }, []);
 
-  // Fetch Marketplace products
+  // ===== Fetch Marketplace products =====
   useEffect(() => {
     const fetchMarketplace = async () => {
       setLoadingMarket(true);
       try {
         const { data, error } = await supabase
           .from("products")
-          .select("id, title, price, location, images")
+          .select("id, name, title, price, city, images")
           .eq("status", "active")
-          .eq("marketplace_type", "marketplace")
+          .eq("marketplace_type", "marketplace") // Use marketplace_type
           .order("created_at", { ascending: false })
           .limit(12);
 
@@ -65,10 +64,10 @@ export default function Home() {
     fetchMarketplace();
   }, []);
 
-  // Filter products
+  // ===== Filter products by search =====
   const filterProducts = (products) =>
     products.filter((p) =>
-      p.title?.toLowerCase().includes(debouncedSearch.toLowerCase())
+      (p.title || p.name).toLowerCase().includes(debouncedSearch.toLowerCase())
     );
 
   const filteredMiniMart = filterProducts(miniMartProducts);
@@ -125,9 +124,10 @@ export default function Home() {
 
 // ===== MiniMart Card =====
 function MiniMartCard({ product }) {
-  const firstImage = product.images?.[0]?.image_url;
+  const firstImage = product.images?.[0];
   const [timeLeft, setTimeLeft] = useState("");
-  const title = product.title?.length > 45 ? product.title.slice(0, 45) + "..." : product.title;
+  const title = (product.title || product.name);
+  const displayTitle = title.length > 45 ? title.slice(0, 45) + "..." : title;
 
   useEffect(() => {
     if (!product.flash_sale_end) return;
@@ -151,18 +151,15 @@ function MiniMartCard({ product }) {
   return (
     <div className="product-card minimart-card hover-shadow">
       <div className="product-image">
-        {firstImage
-          ? <img src={firstImage} alt={product.title} loading="lazy" />
-          : <div className="image-placeholder">📦</div>
-        }
+        {firstImage ? <img src={firstImage} alt={title} /> : <div className="image-placeholder">📦</div>}
       </div>
       <div className="product-content">
         <div className="product-price">
           <span className="current-price">₦{Number(product.price).toLocaleString()}</span>
           {product.discount_price && <span className="discount-price">₦{Number(product.discount_price).toLocaleString()}</span>}
         </div>
-        <h3 className="product-title">{title}</h3>
-        {product.flash_sale_end && <div className="countdown">{timeLeft}</div>}
+        <h3 className="product-title">{displayTitle}</h3>
+        {product.flash_sale_end && <div className="countdown">⏰ {timeLeft}</div>}
         <span className="flash-badge">Flash Sale</span>
       </div>
     </div>
@@ -171,20 +168,18 @@ function MiniMartCard({ product }) {
 
 // ===== Marketplace Card =====
 function MarketplaceCard({ product }) {
-  const firstImage = product.images?.[0]?.image_url;
-  const title = product.title?.length > 50 ? product.title.slice(0, 50) + "..." : product.title;
+  const firstImage = product.images?.[0];
+  const title = product.title || product.name;
+  const displayTitle = title.length > 50 ? title.slice(0, 50) + "..." : title;
 
   return (
     <div className="product-card marketplace-card hover-shadow">
       <div className="product-image">
-        {firstImage
-          ? <img src={firstImage} alt={product.title} loading="lazy" />
-          : <div className="image-placeholder">🏪</div>
-        }
+        {firstImage ? <img src={firstImage} alt={title} /> : <div className="image-placeholder">🏪</div>}
       </div>
       <div className="product-content">
-        <h3 className="product-title">{title}</h3>
-        <p className="product-location">📍 {product.location || "Nationwide"}</p>
+        <h3 className="product-title">{displayTitle}</h3>
+        <p className="product-location">📍 {product.city || "Nationwide"}</p>
       </div>
     </div>
   );

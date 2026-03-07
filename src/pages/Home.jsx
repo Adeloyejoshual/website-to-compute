@@ -1,3 +1,4 @@
+// src/pages/Home.jsx
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import "./Home.css";
@@ -25,9 +26,10 @@ export default function Home() {
           .from("products")
           .select("id, title, price, discount_price, flash_sale_end, images")
           .eq("status", "active")
-          .eq("type", "minimart")
+          .eq("marketplace_type", "minimart")
           .order("created_at", { ascending: false })
           .limit(12);
+
         if (error) throw error;
         setMiniMartProducts(data || []);
       } catch (err) {
@@ -48,9 +50,10 @@ export default function Home() {
           .from("products")
           .select("id, title, price, location, images")
           .eq("status", "active")
-          .eq("type", "marketplace")
+          .eq("marketplace_type", "marketplace")
           .order("created_at", { ascending: false })
           .limit(12);
+
         if (error) throw error;
         setMarketplaceProducts(data || []);
       } catch (err) {
@@ -62,9 +65,10 @@ export default function Home() {
     fetchMarketplace();
   }, []);
 
+  // Filter products
   const filterProducts = (products) =>
     products.filter((p) =>
-      p.title.toLowerCase().includes(debouncedSearch.toLowerCase())
+      p.title?.toLowerCase().includes(debouncedSearch.toLowerCase())
     );
 
   const filteredMiniMart = filterProducts(miniMartProducts);
@@ -93,9 +97,7 @@ export default function Home() {
         </div>
         <div className="products-grid minimart-grid">
           {loadingMini
-            ? Array(6)
-                .fill(0)
-                .map((_, i) => <SkeletonCard key={`mini-${i}`} />)
+            ? Array(6).fill(0).map((_, i) => <SkeletonCard key={`mini-${i}`} />)
             : filteredMiniMart.length === 0
             ? <EmptyState text="No flash deals found" onClear={() => setSearchTerm("")} />
             : filteredMiniMart.map((p) => <MiniMartCard key={p.id} product={p} />)
@@ -110,9 +112,7 @@ export default function Home() {
         </div>
         <div className="products-grid marketplace-grid">
           {loadingMarket
-            ? Array(6)
-                .fill(0)
-                .map((_, i) => <SkeletonCard key={`market-${i}`} />)
+            ? Array(6).fill(0).map((_, i) => <SkeletonCard key={`market-${i}`} />)
             : filteredMarketplace.length === 0
             ? <EmptyState text="No marketplace listings found" onClear={() => setSearchTerm("")} />
             : filteredMarketplace.map((p) => <MarketplaceCard key={p.id} product={p} />)
@@ -125,9 +125,9 @@ export default function Home() {
 
 // ===== MiniMart Card =====
 function MiniMartCard({ product }) {
-  const firstImage = product.images?.[0];
+  const firstImage = product.images?.[0]?.image_url;
   const [timeLeft, setTimeLeft] = useState("");
-  const title = product.title.length > 45 ? product.title.slice(0, 45) + "..." : product.title;
+  const title = product.title?.length > 45 ? product.title.slice(0, 45) + "..." : product.title;
 
   useEffect(() => {
     if (!product.flash_sale_end) return;
@@ -151,7 +151,10 @@ function MiniMartCard({ product }) {
   return (
     <div className="product-card minimart-card hover-shadow">
       <div className="product-image">
-        {firstImage ? <img src={firstImage} alt={product.title} /> : <div className="image-placeholder">📦</div>}
+        {firstImage
+          ? <img src={firstImage} alt={product.title} loading="lazy" />
+          : <div className="image-placeholder">📦</div>
+        }
       </div>
       <div className="product-content">
         <div className="product-price">
@@ -159,7 +162,7 @@ function MiniMartCard({ product }) {
           {product.discount_price && <span className="discount-price">₦{Number(product.discount_price).toLocaleString()}</span>}
         </div>
         <h3 className="product-title">{title}</h3>
-        {product.flash_sale_end && <div className="countdown">⏰ {timeLeft}</div>}
+        {product.flash_sale_end && <div className="countdown">{timeLeft}</div>}
         <span className="flash-badge">Flash Sale</span>
       </div>
     </div>
@@ -168,13 +171,16 @@ function MiniMartCard({ product }) {
 
 // ===== Marketplace Card =====
 function MarketplaceCard({ product }) {
-  const firstImage = product.images?.[0];
-  const title = product.title.length > 50 ? product.title.slice(0, 50) + "..." : product.title;
+  const firstImage = product.images?.[0]?.image_url;
+  const title = product.title?.length > 50 ? product.title.slice(0, 50) + "..." : product.title;
 
   return (
     <div className="product-card marketplace-card hover-shadow">
       <div className="product-image">
-        {firstImage ? <img src={firstImage} alt={product.title} /> : <div className="image-placeholder">🏪</div>}
+        {firstImage
+          ? <img src={firstImage} alt={product.title} loading="lazy" />
+          : <div className="image-placeholder">🏪</div>
+        }
       </div>
       <div className="product-content">
         <h3 className="product-title">{title}</h3>

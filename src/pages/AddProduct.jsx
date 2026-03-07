@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 
+// Cloudinary config from .env
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
@@ -8,7 +9,7 @@ export default function AddProduct() {
   const [userId, setUserId] = useState(null);
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
-  const [image, setImage] = useState(null);
+  const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -23,19 +24,22 @@ export default function AddProduct() {
     fetchUser();
   }, []);
 
-  // Upload image to Cloudinary
-  const uploadImage = async () => {
-    if (!image) return null;
+  // Handle multiple file selection
+  const handleFileChange = (e) => {
+    const files = Array.from(e.target.files);
+    setImages(files);
+  };
 
+  // Upload image to Cloudinary
+  const uploadImage = async (file) => {
     const formData = new FormData();
-    formData.append("file", image);
+    formData.append("file", file);
     formData.append("upload_preset", UPLOAD_PRESET);
 
     const res = await fetch(
       `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
       { method: "POST", body: formData }
     );
-
     const data = await res.json();
     return data.secure_url;
   };
@@ -45,6 +49,11 @@ export default function AddProduct() {
 
     if (!userId) {
       setMessage("❌ Please log in first.");
+      return;
+    }
+
+    if (!name || !price) {
+      setMessage("❌ Name and Price are required.");
       return;
     }
 
@@ -67,28 +76,23 @@ export default function AddProduct() {
 
       if (error) throw error;
 
-      // 2️⃣ Upload image (optional)
-      if (image) {
-        const imageUrl = await uploadImage();
-        if (imageUrl) {
-          const { error: imgError } = await supabase
-            .from("product_images")
-            .insert([
-              {
-                product_id: product.id,
-                image_url: imageUrl,
-                is_primary: true,
-                position: 1,
-              },
-            ]);
-          if (imgError) throw imgError;
-        }
+      // 2️⃣ Upload images and insert into product_images
+      for (let i = 0; i < images.length; i++) {
+        const url = await uploadImage(images[i]);
+        await supabase.from("product_images").insert([
+          {
+            product_id: product.id,
+            image_url: url,
+            is_primary: i === 0, // first image is primary
+            position: i + 1,
+          },
+        ]);
       }
 
       setMessage("✅ Product added successfully!");
       setName("");
       setPrice("");
-      setImage(null);
+      setImages([]);
     } catch (err) {
       console.error(err);
       setMessage("❌ " + err.message);
@@ -98,7 +102,7 @@ export default function AddProduct() {
   };
 
   return (
-    <div style={{ maxWidth: 420, margin: "40px auto" }}>
+    <div style={{ maxWidth: 450, margin: "40px auto" }}>
       <h2>Add Product</h2>
 
       <form
@@ -124,15 +128,22 @@ export default function AddProduct() {
         <input
           type="file"
           accept="image/*"
-          onChange={(e) => setImage(e.target.files[0])}
+          multiple
+          onChange={handleFileChange}
         />
 
-        {image && (
-          <img
-            src={URL.createObjectURL(image)}
-            alt="preview"
-            style={{ width: "100%", borderRadius: 8 }}
-          />
+        {/* Image previews */}
+        {images.length > 0 && (
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            {images.map((img, idx) => (
+              <img
+                key={idx}
+                src={URL.createObjectURL(img)}
+                alt={`preview-${idx}`}
+                style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 6 }}
+              />
+            ))}
+          </div>
         )}
 
         <button type="submit" disabled={loading}>

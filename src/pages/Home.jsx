@@ -1,25 +1,14 @@
-import { useState, useEffect, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
-import { useNavigate } from "react-router-dom";
+import "./Home.css";
 
 export default function Home() {
-  const navigate = useNavigate();
   const [miniMartProducts, setMiniMartProducts] = useState([]);
   const [marketplaceProducts, setMarketplaceProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [activeTab, setActiveTab] = useState("all");
   const [loadingMini, setLoadingMini] = useState(true);
   const [loadingMarket, setLoadingMarket] = useState(true);
-  const [flashCountdown, setFlashCountdown] = useState("04:23:15");
-
-  // Flash sale banner countdown
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setFlashCountdown("04:23:15"); // Replace with real countdown logic
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   // Debounce search
   useEffect(() => {
@@ -27,271 +16,193 @@ export default function Home() {
     return () => clearTimeout(timeout);
   }, [searchTerm]);
 
-  // Fetch MiniMart products
+  // Fetch MiniMart
   useEffect(() => {
+    const fetchMiniMart = async () => {
+      setLoadingMini(true);
+      try {
+        const { data, error } = await supabase
+          .from("products")
+          .select("id, title, price, discount_price, flash_sale_end, images")
+          .eq("status", "active")
+          .eq("type", "minimart")
+          .order("created_at", { ascending: false })
+          .limit(12);
+        if (error) throw error;
+        setMiniMartProducts(data || []);
+      } catch (err) {
+        console.error("MiniMart fetch error:", err);
+      } finally {
+        setLoadingMini(false);
+      }
+    };
     fetchMiniMart();
   }, []);
 
-  // Fetch Marketplace products
+  // Fetch Marketplace
   useEffect(() => {
+    const fetchMarketplace = async () => {
+      setLoadingMarket(true);
+      try {
+        const { data, error } = await supabase
+          .from("products")
+          .select("id, title, price, location, images")
+          .eq("status", "active")
+          .eq("type", "marketplace")
+          .order("created_at", { ascending: false })
+          .limit(12);
+        if (error) throw error;
+        setMarketplaceProducts(data || []);
+      } catch (err) {
+        console.error("Marketplace fetch error:", err);
+      } finally {
+        setLoadingMarket(false);
+      }
+    };
     fetchMarketplace();
   }, []);
 
-  const fetchMiniMart = async () => {
-    setLoadingMini(true);
-    try {
-      const { data } = await supabase
-        .from("products")
-        .select("id, title, price, discount_price, flash_sale_end, images, category")
-        .eq("type", "minimart")
-        .eq("status", "active")
-        .limit(16)
-        .order("created_at", { ascending: false });
-      setMiniMartProducts(data || []);
-    } catch (error) {
-      console.error("MiniMart error:", error);
-    } finally {
-      setLoadingMini(false);
-    }
-  };
-
-  const fetchMarketplace = async () => {
-    setLoadingMarket(true);
-    try {
-      const { data } = await supabase
-        .from("products")
-        .select("id, title, price, location, images, category")
-        .eq("type", "marketplace")
-        .eq("status", "active")
-        .limit(16)
-        .order("created_at", { ascending: false });
-      setMarketplaceProducts(data || []);
-    } catch (error) {
-      console.error("Marketplace error:", error);
-    } finally {
-      setLoadingMarket(false);
-    }
-  };
-
+  // Filter products by search
   const filterProducts = (products) =>
     products.filter(
       (p) =>
-        p.title.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-        p.category.toLowerCase().includes(debouncedSearch.toLowerCase())
+        p.title.toLowerCase().includes(debouncedSearch.toLowerCase())
     );
 
   const filteredMiniMart = filterProducts(miniMartProducts);
   const filteredMarketplace = filterProducts(marketplaceProducts);
 
-  const goToProduct = (id) => navigate(`/product/${id}`);
-
   return (
-    <div className="homepage">
-      {/* ===== FLASH SALE BANNER ===== */}
-      <div className="flash-banner">
-        <span>🔥</span>
-        <span>48 Hours Flash Sale - Up to 70% OFF Everything!</span>
-        <span>{flashCountdown}</span>
-      </div>
-
-      {/* ===== TOP NAVIGATION ===== */}
-      <nav className="top-nav">
-        <div className="nav-container">
-          <button 
-            className={`nav-tab ${activeTab === "all" ? "active" : ""}`}
-            onClick={() => setActiveTab("all")}
-          >
-            All Deals
-          </button>
-          <button 
-            className={`nav-tab ${activeTab === "electronics" ? "active" : ""}`}
-            onClick={() => setActiveTab("electronics")}
-          >
-            Electronics
-          </button>
-          <button 
-            className={`nav-tab ${activeTab === "vehicles" ? "active" : ""}`}
-            onClick={() => setActiveTab("vehicles")}
-          >
-            Vehicles
-          </button>
-        </div>
-      </nav>
-
-      {/* ===== HERO SECTION ===== */}
+    <div className="home-container">
+      {/* HERO */}
       <header className="hero-section">
-        <div className="hero-content">
-          <h1 className="hero-title">🛒 MiniMart Marketplace</h1>
-          <p className="hero-subtitle">
-            {filteredMiniMart.length + filteredMarketplace.length} amazing deals near you
-          </p>
-          <div className="search-container">
-            <input
-              className="search-input"
-              placeholder="🔍 Search phones, cars, laptops..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-        </div>
+        <h1 className="hero-title">🛒 MiniMart Marketplace</h1>
+        <p className="hero-subtitle">
+          {filteredMiniMart.length + filteredMarketplace.length} deals found
+        </p>
+        <input
+          className="search-input"
+          placeholder="🔍 Search products..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </header>
 
-      {/* ===== MINIMART FLASH DEALS ===== */}
-      <section className="products-section">
+      {/* MINI-MART */}
+      <section className="section">
         <div className="section-header">
           <h2 className="section-title">🔥 MiniMart Featured Deals</h2>
-          <button className="see-all-btn">See All Deals →</button>
         </div>
-        <div className="products-grid">
-          {loadingMini ? (
-            Array(8).fill(0).map((_, i) => <SkeletonCard key={`mini-${i}`} />)
-          ) : filteredMiniMart.length === 0 ? (
-            <EmptyState text="No flash deals found" onClear={() => setSearchTerm("")} />
-          ) : (
-            filteredMiniMart.map((product) => (
-              <ProductCard 
-                key={product.id} 
-                product={product} 
-                type="minimart" 
-                onView={() => goToProduct(product.id)}
-              />
-            ))
-          )}
+        <div className="products-grid minimart-grid">
+          {loadingMini
+            ? Array(6)
+                .fill(0)
+                .map((_, i) => <SkeletonCard key={`mini-${i}`} />)
+            : filteredMiniMart.length === 0
+            ? <EmptyState text="No flash deals found" onClear={() => setSearchTerm("")} />
+            : filteredMiniMart.map((p) => <MiniMartCard key={p.id} product={p} />)
+          }
         </div>
       </section>
 
-      {/* ===== MARKETPLACE LISTINGS ===== */}
-      <section className="products-section">
+      {/* MARKETPLACE */}
+      <section className="section">
         <div className="section-header">
-          <h2 className="section-title">🏪 Trending Marketplace Listings</h2>
-          <button className="see-all-btn">Browse Marketplace →</button>
+          <h2 className="section-title">🏪 Marketplace Trending</h2>
         </div>
-        <div className="products-grid">
-          {loadingMarket ? (
-            Array(8).fill(0).map((_, i) => <SkeletonCard key={`market-${i}`} />)
-          ) : filteredMarketplace.length === 0 ? (
-            <EmptyState text="No listings found" onClear={() => setSearchTerm("")} />
-          ) : (
-            filteredMarketplace.map((product) => (
-              <ProductCard 
-                key={product.id} 
-                product={product} 
-                type="marketplace" 
-                onView={() => goToProduct(product.id)}
-              />
-            ))
-          )}
+        <div className="products-grid marketplace-grid">
+          {loadingMarket
+            ? Array(6)
+                .fill(0)
+                .map((_, i) => <SkeletonCard key={`market-${i}`} />)
+            : filteredMarketplace.length === 0
+            ? <EmptyState text="No marketplace listings found" onClear={() => setSearchTerm("")} />
+            : filteredMarketplace.map((p) => <MarketplaceCard key={p.id} product={p} />)
+          }
         </div>
       </section>
     </div>
   );
 }
 
-// ===== UNIVERSAL PRODUCT CARD =====
-function ProductCard({ product, type, onView }) {
+// ===== MiniMart Card =====
+function MiniMartCard({ product }) {
   const firstImage = product.images?.[0];
-  const title = product.title?.length > 45 ? `${product.title.slice(0, 45)}...` : product.title;
   const [timeLeft, setTimeLeft] = useState("");
+  const title = product.title.length > 45 ? product.title.slice(0, 45) + "..." : product.title;
 
   useEffect(() => {
-    if (type !== "minimart" || !product.flash_sale_end) return;
-
+    if (!product.flash_sale_end) return;
     const updateTimer = () => {
       const now = new Date();
       const end = new Date(product.flash_sale_end);
       const diff = end - now;
-      
-      if (diff <= 0) {
-        setTimeLeft("Ended");
-        return;
-      }
-      
+      if (diff <= 0) return setTimeLeft("Sale Ended");
       const hours = Math.floor(diff / (1000 * 60 * 60));
       const minutes = Math.floor((diff / (1000 * 60)) % 60);
       const seconds = Math.floor((diff / 1000) % 60);
       setTimeLeft(`${hours}h ${minutes}m ${seconds}s`);
     };
-
     const interval = setInterval(updateTimer, 1000);
     updateTimer();
     return () => clearInterval(interval);
-  }, [product.flash_sale_end, type]);
-
-  const isUrgent = type === "minimart" && 
-    product.flash_sale_end && new Date(product.flash_sale_end) - new Date() < 3600000;
+  }, [product.flash_sale_end]);
 
   return (
-    <div className={`product-card ${type}`} onClick={onView}>
-      <div className="flash-badge">{type === "minimart" ? "🔥 FLASH" : "🏪"}</div>
-      
+    <div className="product-card minimart-card">
       <div className="product-image">
-        {firstImage ? (
-          <img src={firstImage} alt={product.title} loading="lazy" />
-        ) : (
-          <div className="image-placeholder">
-            {type === "minimart" ? "📦" : "🏪"}
-          </div>
-        )}
+        {firstImage ? <img src={firstImage} alt={product.title} /> : <div className="image-placeholder">📦</div>}
       </div>
-      
       <div className="product-content">
-        {type === "minimart" && product.discount_price && (
-          <div className="price-discount">
-            <span className="old-price">₦{Number(product.price).toLocaleString()}</span>
-            <span className="new-price">
-              ₦{Number(product.discount_price).toLocaleString()}
-            </span>
-          </div>
-        )}
-        
+        <div className="product-price">
+          <span className="current-price">₦{Number(product.price).toLocaleString()}</span>
+          {product.discount_price && <span className="discount-price">₦{Number(product.discount_price).toLocaleString()}</span>}
+        </div>
         <h3 className="product-title">{title}</h3>
-        
-        {type === "minimart" && product.flash_sale_end && (
-          <div className={`countdown ${isUrgent ? "urgent" : ""}`}>
-            ⏰ {timeLeft}
-          </div>
-        )}
-        
-        {type === "marketplace" && (
-          <p className="product-location">📍 {product.location || "Nationwide"}</p>
-        )}
-        
-        <button className="view-product-btn" onClick={(e) => {
-          e.stopPropagation();
-          onView();
-        }}>
-          👁️ View Product
-        </button>
+        {product.flash_sale_end && <div className="countdown">⏰ {timeLeft}</div>}
+        <span className="flash-badge">Flash Sale</span>
       </div>
     </div>
   );
 }
 
-// ===== UTILITY COMPONENTS =====
+// ===== Marketplace Card =====
+function MarketplaceCard({ product }) {
+  const firstImage = product.images?.[0];
+  const title = product.title.length > 50 ? product.title.slice(0, 50) + "..." : product.title;
+
+  return (
+    <div className="product-card marketplace-card">
+      <div className="product-image">
+        {firstImage ? <img src={firstImage} alt={product.title} /> : <div className="image-placeholder">🏪</div>}
+      </div>
+      <div className="product-content">
+        <h3 className="product-title">{title}</h3>
+        <p className="product-location">📍 {product.location || "Nationwide"}</p>
+      </div>
+    </div>
+  );
+}
+
+// ===== Skeleton Loader =====
 function SkeletonCard() {
   return (
     <div className="product-card skeleton">
-      <div className="flash-badge skeleton"></div>
       <div className="skeleton-image"></div>
       <div className="skeleton-content">
         <div className="skeleton-line short"></div>
         <div className="skeleton-line medium"></div>
-        <div className="skeleton-line short"></div>
       </div>
     </div>
   );
 }
 
+// ===== Empty State =====
 function EmptyState({ text, onClear }) {
   return (
     <div className="empty-state">
-      <div className="empty-icon">📦</div>
       <p>{text}</p>
-      {onClear && (
-        <button className="clear-search-btn" onClick={onClear}>
-          Clear Search
-        </button>
-      )}
+      {onClear && <button onClick={onClear}>Clear Search</button>}
     </div>
   );
 }

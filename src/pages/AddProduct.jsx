@@ -2,18 +2,18 @@ import { useState } from "react";
 import { supabase } from "../lib/supabase";
 
 export default function AddProduct() {
-  const [title, setTitle] = useState("");
+  const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [message, setMessage] = useState("");
 
-  const addProduct = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     const { error } = await supabase
       .from("products")
       .insert([
         {
-          title: title,
+          name: name,
           price: Number(price),
         },
       ]);
@@ -22,21 +22,25 @@ export default function AddProduct() {
       console.error(error);
       setMessage("❌ " + error.message);
     } else {
-      setMessage("✅ Product added");
-      setTitle("");
+      setMessage("✅ Product added successfully");
+      setName("");
       setPrice("");
     }
   };
 
   return (
     <div style={{ maxWidth: 400, margin: "40px auto" }}>
-      <h2>Add Product (Test)</h2>
+      <h2>Add Product</h2>
 
-      <form onSubmit={addProduct} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <form
+        onSubmit={handleSubmit}
+        style={{ display: "flex", flexDirection: "column", gap: "10px" }}
+      >
         <input
-          placeholder="Product title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          type="text"
+          placeholder="Product Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
           required
         />
 

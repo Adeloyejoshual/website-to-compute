@@ -1,4 +1,4 @@
-// src/pages/Login.jsx
+// src/pages/Login.jsx - Production-ready with automatic user profile creation
 import { useState } from "react"
 import { supabase } from "../lib/supabase"
 
@@ -6,32 +6,50 @@ export default function Login() {
   const [fullName, setFullName] = useState("")
   const [phone, setPhone] = useState("")
   const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [isRegister, setIsRegister] = useState(false)
 
   const validate = () => {
-    if (!email) return "Enter your email"
+    if (!email || !password) return "Enter email and password"
+    if (isRegister && (!fullName.trim() || !phone.trim()))
+      return "Fill all fields"
+
     const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
-    if (!emailRegex.test(email)) return "Enter a valid email"
-    if (isRegister && (!fullName.trim() || !phone.trim())) return "Fill all fields"
-    if (isRegister && !/^[0-9]{7,15}$/.test(phone)) return "Enter valid phone number"
+    if (!emailRegex.test(email)) return "Valid email required"
+
+    if (isRegister && !/^[0-9]{7,15}$/.test(phone))
+      return "Enter valid phone number"
+
+    if (password.length < 6) return "Password must be at least 6 characters"
+
     return null
   }
 
-  // Magic link for register
-  const handleRegister = async () => {
+  const clearForm = () => {
+    setFullName("")
+    setPhone("")
+    setEmail("")
+    setPassword("")
+    setError("")
+  }
+
+  const register = async () => {
     const validationError = validate()
-    if (validationError) return setError(validationError)
+    if (validationError) {
+      setError(validationError)
+      return
+    }
 
     setLoading(true)
     setError("")
 
-    // send magic link
-    const { error: magicError, data } = await supabase.auth.signInWithOtp({
-      email: email.toLowerCase().trim(),
+    // 1️⃣ Sign up in Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: email.trim().toLowerCase(),
+      password: password.trim(),
       options: {
-        emailRedirectTo: `${window.location.origin}/login?type=magic`,
         data: {
           full_name: fullName.trim(),
           phone: phone.trim()
@@ -39,50 +57,74 @@ export default function Login() {
       }
     })
 
-    if (magicError) {
-      setError(magicError.message)
-    } else {
-      alert("✅ Magic link sent! Check your email to complete registration.")
+    if (authError) {
+      setLoading(false)
+      setError(authError.message)
+      return
     }
 
-    setLoading(false)
+    // 2️⃣ Automatically create user row in users table
+    if (authData?.user?.id) {
+      const { error: dbError } = await supabase.from("users").insert([
+        {
+          auth_id: authData.user.id,
+          full_name: fullName.trim(),
+          email: email.trim().toLowerCase(),
+          phone: phone.trim(),
+          is_seller: false,
+          seller_type: "individual",
+          marketplace_type: "buyer",
+          is_active: true,
+          kyc_status: "pending",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+      ])
+
+      setLoading(false)
+
+      if (dbError) {
+        console.error(dbError)
+        setError(
+          "✅ Account created in Auth, but failed to save profile. Contact support."
+        )
+      } else {
+        alert("✅ Success! Check your email to confirm.")
+        setIsRegister(false)
+        clearForm()
+      }
+    }
   }
 
-  // Magic link for login
-  const handleLogin = async () => {
-    if (!email) return setError("Enter your email")
+  const login = async () => {
+    const validationError = validate()
+    if (validationError) {
+      setError(validationError)
+      return
+    }
+
     setLoading(true)
     setError("")
 
-    const { error: magicError } = await supabase.auth.signInWithOtp({
-      email: email.toLowerCase().trim(),
-      options: {
-        emailRedirectTo: `${window.location.origin}/login?type=magic`
-      }
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password: password.trim()
     })
 
-    if (magicError) {
-      setError(magicError.message)
-    } else {
-      alert("✅ Magic link sent! Check your email to login.")
-    }
-
     setLoading(false)
-  }
 
-  const toggleMode = () => {
-    setIsRegister(!isRegister)
-    setError("")
-    setFullName("")
-    setPhone("")
-    setEmail("")
+    if (authError) {
+      setError(authError.message)
+    } else {
+      clearForm()
+    }
   }
 
   return (
     <div style={containerStyle}>
-      <h2 style={headerStyle}>{isRegister ? "Join Marketplace" : "Welcome Back"}</h2>
+      <h2 style={titleStyle}>{isRegister ? "Join Marketplace" : "Welcome Back"}</h2>
 
-      {error && <p style={errorStyle}>{error}</p>}
+      {error && <div style={errorStyle}>{error}</div>}
 
       {isRegister && (
         <>
@@ -102,39 +144,47 @@ export default function Login() {
       )}
 
       <input
-        type="email"
         placeholder="Email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         style={inputStyle}
       />
+      <input
+        type="password"
+        placeholder="Password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        style={inputStyle}
+      />
 
       <button
-        onClick={isRegister ? handleRegister : handleLogin}
+        onClick={isRegister ? register : login}
         disabled={loading}
         style={buttonStylePrimary}
       >
         {loading
-          ? "Sending Magic Link..."
+          ? isRegister
+            ? "Creating Account..."
+            : "Signing In..."
           : isRegister
-          ? "Register with Magic Link"
-          : "Login with Magic Link"}
+          ? "Register"
+          : "Login"}
       </button>
 
       <button
-        onClick={toggleMode}
+        onClick={() => setIsRegister(!isRegister)}
         disabled={loading}
         style={buttonStyleSecondary}
       >
-        {isRegister ? "Already have an account? Login" : "New? Register now"}
+        {isRegister ? "Already have an account? Login" : "New? Create Account"}
       </button>
     </div>
   )
 }
 
-// ---- Styles ----
+// ─────────────────────────── Styles ───────────────────────────
 const containerStyle = {
-  maxWidth: 420,
+  maxWidth: 400,
   margin: "60px auto",
   padding: 30,
   border: "1px solid #e0e0e0",
@@ -142,7 +192,7 @@ const containerStyle = {
   boxShadow: "0 4px 20px rgba(0,0,0,0.08)"
 }
 
-const headerStyle = {
+const titleStyle = {
   textAlign: "center",
   marginBottom: 24,
   color: "#333",
@@ -171,24 +221,24 @@ const inputStyle = {
 const buttonStylePrimary = {
   width: "100%",
   padding: "14px 16px",
+  marginBottom: 12,
+  border: "none",
   borderRadius: 8,
   fontSize: 16,
   fontWeight: 500,
-  cursor: "pointer",
-  background: "#3b82f6",
   color: "white",
-  border: "none",
-  marginBottom: 12
+  background: "#3b82f6",
+  cursor: "pointer"
 }
 
 const buttonStyleSecondary = {
   width: "100%",
   padding: "14px 16px",
+  border: "1px solid #d1d5db",
   borderRadius: 8,
   fontSize: 16,
   fontWeight: 500,
-  cursor: "pointer",
   background: "#f3f4f6",
   color: "#374151",
-  border: "none"
+  cursor: "pointer"
 }

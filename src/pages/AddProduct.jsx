@@ -16,18 +16,15 @@ export default function AddProduct() {
   // Get logged-in user
   useEffect(() => {
     const fetchUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) setUserId(user.id);
+      const { data } = await supabase.auth.getUser();
+      if (data.user) setUserId(data.user.id);
     };
     fetchUser();
   }, []);
 
   // Handle multiple file selection
   const handleFileChange = (e) => {
-    const files = Array.from(e.target.files);
-    setImages(files);
+    setImages(Array.from(e.target.files));
   };
 
   // Upload image to Cloudinary
@@ -47,21 +44,14 @@ export default function AddProduct() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!userId) {
-      setMessage("❌ Please log in first.");
-      return;
-    }
-
-    if (!name || !price) {
-      setMessage("❌ Name and Price are required.");
-      return;
-    }
+    if (!userId) return setMessage("❌ Please log in first.");
+    if (!name || !price) return setMessage("❌ Name and Price are required.");
 
     setLoading(true);
     setMessage("");
 
     try {
-      // 1️⃣ Insert product
+      // 1️⃣ Insert product with fixed type 'marketplace'
       const { data: product, error } = await supabase
         .from("products")
         .insert([
@@ -69,6 +59,9 @@ export default function AddProduct() {
             name,
             price: Number(price),
             seller_id: userId,
+            type: "marketplace",      // fixed type
+            status: "active",
+            is_public: true,
           },
         ])
         .select()
@@ -83,7 +76,7 @@ export default function AddProduct() {
           {
             product_id: product.id,
             image_url: url,
-            is_primary: i === 0, // first image is primary
+            is_primary: i === 0,
             position: i + 1,
           },
         ]);
@@ -103,7 +96,7 @@ export default function AddProduct() {
 
   return (
     <div style={{ maxWidth: 450, margin: "40px auto" }}>
-      <h2>Add Product</h2>
+      <h2>Add Marketplace Product</h2>
 
       <form
         onSubmit={handleSubmit}
@@ -132,7 +125,6 @@ export default function AddProduct() {
           onChange={handleFileChange}
         />
 
-        {/* Image previews */}
         {images.length > 0 && (
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             {images.map((img, idx) => (
@@ -140,7 +132,12 @@ export default function AddProduct() {
                 key={idx}
                 src={URL.createObjectURL(img)}
                 alt={`preview-${idx}`}
-                style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 6 }}
+                style={{
+                  width: 80,
+                  height: 80,
+                  objectFit: "cover",
+                  borderRadius: 6,
+                }}
               />
             ))}
           </div>

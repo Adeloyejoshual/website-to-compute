@@ -4,58 +4,76 @@ import { supabase } from "../lib/supabase";
 export default function AddProduct() {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
-  const [message, setMessage] = useState("");
+  const [image, setImage] = useState(null);
+
+  const uploadImage = async () => {
+    const formData = new FormData();
+    formData.append("file", image);
+    formData.append("upload_preset", "marketplace");
+
+    const res = await fetch(
+      "https://api.cloudinary.com/v1_1/YOUR_CLOUD_NAME/image/upload",
+      { method: "POST", body: formData }
+    );
+
+    const data = await res.json();
+    return data.secure_url;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const { error } = await supabase
+    // 1️⃣ insert product
+    const { data: product, error } = await supabase
       .from("products")
-      .insert([
-        {
-          name: name,
-          price: Number(price),
-        },
-      ]);
+      .insert([{ name, price: Number(price) }])
+      .select()
+      .single();
 
     if (error) {
       console.error(error);
-      setMessage("❌ " + error.message);
-    } else {
-      setMessage("✅ Product added successfully");
-      setName("");
-      setPrice("");
+      return;
     }
+
+    // 2️⃣ upload image
+    const imageUrl = await uploadImage();
+
+    // 3️⃣ save image
+    await supabase.from("product_images").insert([
+      {
+        product_id: product.id,
+        image_url: imageUrl,
+        is_primary: true,
+        position: 1,
+      },
+    ]);
+
+    alert("Product added!");
   };
 
   return (
-    <div style={{ maxWidth: 400, margin: "40px auto" }}>
+    <div>
       <h2>Add Product</h2>
 
-      <form
-        onSubmit={handleSubmit}
-        style={{ display: "flex", flexDirection: "column", gap: "10px" }}
-      >
+      <form onSubmit={handleSubmit}>
         <input
-          type="text"
-          placeholder="Product Name"
-          value={name}
+          placeholder="Product name"
           onChange={(e) => setName(e.target.value)}
-          required
         />
 
         <input
           type="number"
           placeholder="Price"
-          value={price}
           onChange={(e) => setPrice(e.target.value)}
-          required
+        />
+
+        <input
+          type="file"
+          onChange={(e) => setImage(e.target.files[0])}
         />
 
         <button type="submit">Add Product</button>
       </form>
-
-      {message && <p>{message}</p>}
     </div>
   );
 }

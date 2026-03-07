@@ -16,15 +16,18 @@ export default function AddProduct() {
   // Get logged-in user
   useEffect(() => {
     const fetchUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (data.user) setUserId(data.user.id);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) setUserId(user.id);
     };
     fetchUser();
   }, []);
 
   // Handle multiple file selection
   const handleFileChange = (e) => {
-    setImages(Array.from(e.target.files));
+    const files = Array.from(e.target.files);
+    setImages(files);
   };
 
   // Upload image to Cloudinary
@@ -44,14 +47,21 @@ export default function AddProduct() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!userId) return setMessage("❌ Please log in first.");
-    if (!name || !price) return setMessage("❌ Name and Price are required.");
+    if (!userId) {
+      setMessage("❌ Please log in first.");
+      return;
+    }
+
+    if (!name || !price) {
+      setMessage("❌ Name and Price are required.");
+      return;
+    }
 
     setLoading(true);
     setMessage("");
 
     try {
-      // 1️⃣ Insert product with fixed type 'marketplace'
+      // 1️⃣ Insert product with fixed seller_type and marketplace_type
       const { data: product, error } = await supabase
         .from("products")
         .insert([
@@ -59,9 +69,10 @@ export default function AddProduct() {
             name,
             price: Number(price),
             seller_id: userId,
-            type: "marketplace",      // fixed type
+            seller_type: "public",           // fixed
+            marketplace_type: "marketplace", // fixed
             status: "active",
-            is_public: true,
+            stock: 1,
           },
         ])
         .select()
@@ -76,7 +87,7 @@ export default function AddProduct() {
           {
             product_id: product.id,
             image_url: url,
-            is_primary: i === 0,
+            is_primary: i === 0, // first image is primary
             position: i + 1,
           },
         ]);
@@ -96,7 +107,7 @@ export default function AddProduct() {
 
   return (
     <div style={{ maxWidth: 450, margin: "40px auto" }}>
-      <h2>Add Marketplace Product</h2>
+      <h2>Add Product</h2>
 
       <form
         onSubmit={handleSubmit}
@@ -125,6 +136,7 @@ export default function AddProduct() {
           onChange={handleFileChange}
         />
 
+        {/* Image previews */}
         {images.length > 0 && (
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             {images.map((img, idx) => (
@@ -132,12 +144,7 @@ export default function AddProduct() {
                 key={idx}
                 src={URL.createObjectURL(img)}
                 alt={`preview-${idx}`}
-                style={{
-                  width: 80,
-                  height: 80,
-                  objectFit: "cover",
-                  borderRadius: 6,
-                }}
+                style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 6 }}
               />
             ))}
           </div>

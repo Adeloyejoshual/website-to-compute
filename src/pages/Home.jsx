@@ -9,13 +9,13 @@ export default function Home() {
     const fetchProducts = async () => {
       const { data, error } = await supabase
         .from("products")
-        .select(`id, title, price, product_images(image_url)`)
+        .select(`id, title, price`) // only title and price
         .eq("marketplace_type", "marketplace")
         .eq("status", "active")
         .order("created_at", { ascending: false });
 
       if (error) {
-        console.error(error);
+        console.error("Error fetching products:", error);
       } else {
         setProducts(data || []);
       }
@@ -23,6 +23,7 @@ export default function Home() {
     fetchProducts();
   }, []);
 
+  // Simple search by title
   const filtered = products.filter((p) =>
     (p.title || "").toLowerCase().includes(search.toLowerCase())
   );
@@ -49,22 +50,10 @@ export default function Home() {
             padding: 16,
             marginBottom: 12,
             borderRadius: 8,
-            display: "flex",
-            gap: 12,
-            alignItems: "center",
           }}
         >
-          <img
-            src={p.product_images?.[0]?.image_url || ""}
-            alt={p.title}
-            width={80}
-            height={80}
-            style={{ objectFit: "cover", borderRadius: 6 }}
-          />
-          <div>
-            <h3>{p.title || "Unnamed Product"}</h3>
-            <p>₦{Number(p.price).toLocaleString()}</p>
-          </div>
+          <h3>{p.title || "Untitled Product"}</h3>
+          <p>₦{Number(p.price).toLocaleString()}</p>
         </div>
       ))}
     </div>

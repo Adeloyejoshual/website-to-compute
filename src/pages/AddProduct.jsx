@@ -7,7 +7,7 @@ const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
 export default function AddProduct() {
   const [userId, setUserId] = useState(null);
-  const [name, setName] = useState("");
+  const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -16,21 +16,17 @@ export default function AddProduct() {
   // Get logged-in user
   useEffect(() => {
     const fetchUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       if (user) setUserId(user.id);
     };
     fetchUser();
   }, []);
 
-  // Handle multiple file selection
   const handleFileChange = (e) => {
-    const files = Array.from(e.target.files);
-    setImages(files);
+    setImages(Array.from(e.target.files));
   };
 
-  // Upload image to Cloudinary
+  // Optional Cloudinary upload
   const uploadImage = async (file) => {
     const formData = new FormData();
     formData.append("file", file);
@@ -46,31 +42,23 @@ export default function AddProduct() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!userId) {
-      setMessage("❌ Please log in first.");
-      return;
-    }
-
-    if (!name || !price) {
-      setMessage("❌ Name and Price are required.");
-      return;
-    }
+    if (!userId) return setMessage("❌ Please log in first.");
+    if (!title || !price) return setMessage("❌ Title and Price are required.");
 
     setLoading(true);
     setMessage("");
 
     try {
-      // 1️⃣ Insert product with fixed seller_type and marketplace_type
+      // Insert product
       const { data: product, error } = await supabase
         .from("products")
         .insert([
           {
-            name,
+            title,
             price: Number(price),
             seller_id: userId,
-            seller_type: "public",           // fixed
-            marketplace_type: "marketplace", // fixed
+            seller_type: "public",
+            marketplace_type: "marketplace",
             status: "active",
             stock: 1,
           },
@@ -80,21 +68,21 @@ export default function AddProduct() {
 
       if (error) throw error;
 
-      // 2️⃣ Upload images and insert into product_images
+      // Optional: upload images
       for (let i = 0; i < images.length; i++) {
         const url = await uploadImage(images[i]);
         await supabase.from("product_images").insert([
           {
             product_id: product.id,
             image_url: url,
-            is_primary: i === 0, // first image is primary
+            is_primary: i === 0,
             position: i + 1,
           },
         ]);
       }
 
       setMessage("✅ Product added successfully!");
-      setName("");
+      setTitle("");
       setPrice("");
       setImages([]);
     } catch (err) {
@@ -115,9 +103,9 @@ export default function AddProduct() {
       >
         <input
           type="text"
-          placeholder="Product Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+          placeholder="Product Title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
           required
         />
 

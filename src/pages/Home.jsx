@@ -1,32 +1,21 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
-import "./Home.css"; // Add your styles here
 
 export default function Home() {
   const [miniMartProducts, setMiniMartProducts] = useState([]);
   const [marketplaceProducts, setMarketplaceProducts] = useState([]);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-
-  // Debounce search input
-  useEffect(() => {
-    const timeout = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(timeout);
-  }, [search]);
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Fetch MiniMart products
   useEffect(() => {
     const fetchMiniMart = async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, price, discount_price, flash_sale_end, product_images(image_url)")
-        .eq("marketplace_type", "minimart")
+        .select("id, title, price, discount_price")
+        .eq("type", "minimart")
         .eq("status", "active")
-        .order("created_at", { ascending: false })
         .limit(12);
-
-      if (error) console.error(error);
-      else setMiniMartProducts(data || []);
+      if (!error) setMiniMartProducts(data || []);
     };
     fetchMiniMart();
   }, []);
@@ -36,108 +25,84 @@ export default function Home() {
     const fetchMarketplace = async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, price, location, product_images(image_url)")
-        .eq("marketplace_type", "marketplace")
+        .select("id, title, location")
+        .eq("type", "marketplace")
         .eq("status", "active")
-        .order("created_at", { ascending: false })
         .limit(12);
-
-      if (error) console.error(error);
-      else setMarketplaceProducts(data || []);
+      if (!error) setMarketplaceProducts(data || []);
     };
     fetchMarketplace();
   }, []);
 
-  const filterProducts = (products) =>
-    products.filter((p) =>
-      p.name?.toLowerCase().includes(debouncedSearch.toLowerCase())
-    );
-
-  const filteredMiniMart = filterProducts(miniMartProducts);
-  const filteredMarketplace = filterProducts(marketplaceProducts);
+  // Simple filter
+  const filteredMiniMart = miniMartProducts.filter((p) =>
+    p.title.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  const filteredMarketplace = marketplaceProducts.filter((p) =>
+    p.title.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
-    <div className="home-container">
-      {/* HERO */}
-      <header className="hero-section">
-        <h1>🛒 MiniMart Marketplace</h1>
-        <p>{filteredMiniMart.length + filteredMarketplace.length} deals found</p>
-        <input
-          type="text"
-          placeholder="Search products..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </header>
+    <div style={{ padding: "2rem", maxWidth: 800, margin: "0 auto" }}>
+      <h1>🛒 MiniMart Marketplace</h1>
+
+      <input
+        type="text"
+        placeholder="Search products..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        style={{
+          width: "100%",
+          padding: "0.5rem",
+          marginBottom: "1.5rem",
+          fontSize: "1rem",
+        }}
+      />
 
       {/* MiniMart Section */}
-      <section>
-        <h2>🔥 MiniMart Deals</h2>
-        <div className="products-grid">
-          {filteredMiniMart.length === 0 && <p>No MiniMart deals found.</p>}
-          {filteredMiniMart.map((p) => (
-            <MiniMartCard key={p.id} product={p} />
-          ))}
-        </div>
-      </section>
+      <h2>🔥 MiniMart Featured Deals</h2>
+      {filteredMiniMart.length === 0 && <p>No deals found</p>}
+      <div style={{ display: "grid", gap: "1rem" }}>
+        {filteredMiniMart.map((p) => (
+          <div
+            key={p.id}
+            style={{
+              padding: "1rem",
+              background: "#f1f1f1",
+              borderRadius: 8,
+            }}
+          >
+            <h3>{p.title}</h3>
+            <p>
+              ₦{p.price.toLocaleString()}{" "}
+              {p.discount_price && (
+                <span style={{ textDecoration: "line-through", color: "#999" }}>
+                  ₦{p.discount_price.toLocaleString()}
+                </span>
+              )}
+            </p>
+          </div>
+        ))}
+      </div>
 
       {/* Marketplace Section */}
-      <section>
-        <h2>🏪 Marketplace Trending</h2>
-        <div className="products-grid">
-          {filteredMarketplace.length === 0 && <p>No marketplace listings found.</p>}
-          {filteredMarketplace.map((p) => (
-            <MarketplaceCard key={p.id} product={p} />
-          ))}
-        </div>
-      </section>
-    </div>
-  );
-}
-
-// ===== MiniMart Card =====
-function MiniMartCard({ product }) {
-  const image = product.product_images?.[0]?.image_url;
-  const [timeLeft, setTimeLeft] = useState("");
-
-  useEffect(() => {
-    if (!product.flash_sale_end) return;
-    const interval = setInterval(() => {
-      const diff = new Date(product.flash_sale_end) - new Date();
-      if (diff <= 0) {
-        setTimeLeft("Sale Ended");
-        clearInterval(interval);
-        return;
-      }
-      const h = Math.floor(diff / (1000 * 60 * 60));
-      const m = Math.floor((diff / (1000 * 60)) % 60);
-      const s = Math.floor((diff / 1000) % 60);
-      setTimeLeft(`${h}h ${m}m ${s}s`);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [product.flash_sale_end]);
-
-  return (
-    <div className="product-card hover-shadow">
-      <img src={image || "/placeholder.png"} alt={product.name} className="product-image" />
-      <h3>{product.name}</h3>
-      <p>₦{Number(product.price).toLocaleString()}</p>
-      {product.discount_price && <p className="discount">₦{Number(product.discount_price).toLocaleString()}</p>}
-      {product.flash_sale_end && <p className="countdown">⏰ {timeLeft}</p>}
-    </div>
-  );
-}
-
-// ===== Marketplace Card =====
-function MarketplaceCard({ product }) {
-  const image = product.product_images?.[0]?.image_url;
-
-  return (
-    <div className="product-card hover-shadow">
-      <img src={image || "/placeholder.png"} alt={product.name} className="product-image" />
-      <h3>{product.name}</h3>
-      <p>📍 {product.location || "Nationwide"}</p>
-      <p>₦{Number(product.price).toLocaleString()}</p>
+      <h2 style={{ marginTop: "2rem" }}>🏪 Marketplace Trending</h2>
+      {filteredMarketplace.length === 0 && <p>No listings found</p>}
+      <div style={{ display: "grid", gap: "1rem" }}>
+        {filteredMarketplace.map((p) => (
+          <div
+            key={p.id}
+            style={{
+              padding: "1rem",
+              background: "#f9f9f9",
+              borderRadius: 8,
+            }}
+          >
+            <h3>{p.title}</h3>
+            <p>📍 {p.location || "Nationwide"}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -1,108 +1,97 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 
 export default function Home() {
-  const [miniMartProducts, setMiniMartProducts] = useState([]);
-  const [marketplaceProducts, setMarketplaceProducts] = useState([]);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Fetch MiniMart products
   useEffect(() => {
-    const fetchMiniMart = async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select("id, title, price, discount_price")
-        .eq("type", "minimart")
-        .eq("status", "active")
-        .limit(12);
-      if (!error) setMiniMartProducts(data || []);
-    };
-    fetchMiniMart();
-  }, []);
+    const fetchProducts = async () => {
+      try {
+        // Join products with product_images (get first image only)
+        const { data, error } = await supabase
+          .from("products")
+          .select(`
+            id,
+            title,
+            price,
+            product_images!inner(image_url, is_primary)
+          `)
+          .order("created_at", { ascending: false });
 
-  // Fetch Marketplace products
-  useEffect(() => {
-    const fetchMarketplace = async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select("id, title, location")
-        .eq("type", "marketplace")
-        .eq("status", "active")
-        .limit(12);
-      if (!error) setMarketplaceProducts(data || []);
-    };
-    fetchMarketplace();
-  }, []);
+        if (error) throw error;
 
-  // Simple filter
-  const filteredMiniMart = miniMartProducts.filter((p) =>
-    p.title.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-  const filteredMarketplace = marketplaceProducts.filter((p) =>
-    p.title.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+        // Map first image only
+        const formatted = data.map((p) => ({
+          ...p,
+          image: p.product_images?.[0]?.image_url || null,
+        }));
+
+        setProducts(formatted);
+      } catch (err) {
+        console.error("Error fetching products:", err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
 
   return (
-    <div style={{ padding: "2rem", maxWidth: 800, margin: "0 auto" }}>
-      <h1>🛒 MiniMart Marketplace</h1>
+    <div style={{ maxWidth: 900, margin: "40px auto", padding: "0 20px" }}>
+      <h1>Marketplace Products</h1>
 
-      <input
-        type="text"
-        placeholder="Search products..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        style={{
-          width: "100%",
-          padding: "0.5rem",
-          marginBottom: "1.5rem",
-          fontSize: "1rem",
-        }}
-      />
-
-      {/* MiniMart Section */}
-      <h2>🔥 MiniMart Featured Deals</h2>
-      {filteredMiniMart.length === 0 && <p>No deals found</p>}
-      <div style={{ display: "grid", gap: "1rem" }}>
-        {filteredMiniMart.map((p) => (
-          <div
-            key={p.id}
-            style={{
-              padding: "1rem",
-              background: "#f1f1f1",
-              borderRadius: 8,
-            }}
-          >
-            <h3>{p.title}</h3>
-            <p>
-              ₦{p.price.toLocaleString()}{" "}
-              {p.discount_price && (
-                <span style={{ textDecoration: "line-through", color: "#999" }}>
-                  ₦{p.discount_price.toLocaleString()}
-                </span>
+      {loading ? (
+        <p>Loading products...</p>
+      ) : products.length === 0 ? (
+        <p>No products found.</p>
+      ) : (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+            gap: 20,
+          }}
+        >
+          {products.map((p) => (
+            <div
+              key={p.id}
+              style={{
+                border: "1px solid #ddd",
+                borderRadius: 8,
+                padding: 10,
+                textAlign: "center",
+              }}
+            >
+              {p.image ? (
+                <img
+                  src={p.image}
+                  alt={p.title}
+                  style={{ width: "100%", height: 150, objectFit: "cover", borderRadius: 6 }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: "100%",
+                    height: 150,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "#f0f0f0",
+                    borderRadius: 6,
+                  }}
+                >
+                  📦 No Image
+                </div>
               )}
-            </p>
-          </div>
-        ))}
-      </div>
 
-      {/* Marketplace Section */}
-      <h2 style={{ marginTop: "2rem" }}>🏪 Marketplace Trending</h2>
-      {filteredMarketplace.length === 0 && <p>No listings found</p>}
-      <div style={{ display: "grid", gap: "1rem" }}>
-        {filteredMarketplace.map((p) => (
-          <div
-            key={p.id}
-            style={{
-              padding: "1rem",
-              background: "#f9f9f9",
-              borderRadius: 8,
-            }}
-          >
-            <h3>{p.title}</h3>
-            <p>📍 {p.location || "Nationwide"}</p>
-          </div>
-        ))}
-      </div>
+              <h3 style={{ margin: "10px 0 5px" }}>{p.title}</h3>
+              <p>₦{Number(p.price).toLocaleString()}</p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

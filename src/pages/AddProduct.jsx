@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 
-// Cloudinary config from environment
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
@@ -13,7 +12,6 @@ export default function AddProduct() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  // get current user
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -22,171 +20,102 @@ export default function AddProduct() {
     getUser();
   }, []);
 
-  // handle image selection
   const handleFileChange = (e) => {
-    const files = Array.from(e.target.files);
-    setImages(files);
+    setImages(Array.from(e.target.files));
   };
 
-  // upload single image to Cloudinary
   const uploadImage = async (file) => {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("upload_preset", UPLOAD_PRESET);
 
-    console.log("Uploading file:", file.name);
-    console.log("Cloud name:", CLOUD_NAME, "Preset:", UPLOAD_PRESET);
+    console.log("Uploading:", file.name);
 
-    try {
-      const res = await fetch(
-        `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+      method: "POST",
+      body: formData
+    });
 
-      const data = await res.json();
-      console.log("Cloudinary response:", data);
+    const data = await res.json();
+    console.log("Cloudinary response:", data);
 
-      if (!res.ok || !data.secure_url) {
-        throw new Error(data.error?.message || "Image upload failed");
-      }
-
-      return data.secure_url;
-    } catch (err) {
-      console.error("Upload error:", err);
-      throw new Error(err.message || "Image upload failed");
+    if (!res.ok || !data.secure_url) {
+      throw new Error(data.error?.message || "Image upload failed");
     }
+    return data.secure_url;
   };
 
-  // handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!userId) {
-      setMessage("❌ Please log in first");
-      return;
-    }
-
-    if (!title || !price) {
-      setMessage("❌ Title and Price are required");
-      return;
-    }
+    if (!userId) return setMessage("❌ Please log in first");
+    if (!title || !price) return setMessage("❌ Title and Price required");
 
     setLoading(true);
     setMessage("");
 
     try {
-      // 1️⃣ create product
+      // 1️⃣ Create product
       const { data: product, error } = await supabase
         .from("products")
-        .insert([
-          {
-            title,
-            price: Number(price),
-            seller_id: userId,
-            seller_type: "public",
-            marketplace_type: "marketplace",
-            status: "active",
-            stock: 1,
-          },
-        ])
+        .insert([{
+          title,
+          price: Number(price),
+          seller_id: userId,
+          seller_type: "public",
+          marketplace_type: "marketplace",
+          status: "active",
+          stock: 1
+        }])
         .select()
         .single();
 
       if (error) throw error;
+      if (!product?.id) throw new Error("Failed to get product ID");
 
-      // 2️⃣ upload images
-      if (images.length > 0) {
-        for (let i = 0; i < images.length; i++) {
-          try {
-            const url = await uploadImage(images[i]);
+      // 2️⃣ Upload images and insert into product_images
+      for (let i = 0; i < images.length; i++) {
+        const url = await uploadImage(images[i]);
 
-            const { error: imageError } = await supabase
-              .from("product_images")
-              .insert([
-                {
-                  product_id: product.id,
-                  seller_id: userId,
-                  image_url: url,
-                  is_primary: i === 0,
-                  position: i + 1,
-                },
-              ]);
+        const { error: imgError } = await supabase.from("product_images").insert([{
+          product_id: product.id,       // use the returned product ID
+          seller_id: userId,
+          image_url: url,
+          is_primary: i === 0,          // first image is primary
+          position: i + 1
+        }]);
 
-            if (imageError) throw imageError;
-          } catch (imgErr) {
-            console.error("Failed to upload one image:", imgErr);
-            setMessage(`❌ Failed to upload image: ${images[i].name}`);
-          }
-        }
+        if (imgError) throw imgError;
       }
 
       setMessage("✅ Product added successfully!");
       setTitle("");
       setPrice("");
       setImages([]);
+
     } catch (err) {
-      console.error("Submit error:", err);
+      console.error(err);
       setMessage("❌ " + err.message);
     }
-
     setLoading(false);
   };
 
   return (
     <div style={{ maxWidth: 450, margin: "40px auto" }}>
       <h2>Add Product</h2>
-
-      <form
-        onSubmit={handleSubmit}
-        style={{ display: "flex", flexDirection: "column", gap: 12 }}
-      >
-        <input
-          type="text"
-          placeholder="Product Title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          required
-        />
-
-        <input
-          type="number"
-          placeholder="Price"
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
-          required
-        />
-
-        <input
-          type="file"
-          accept="image/*"
-          multiple
-          onChange={handleFileChange}
-        />
+      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <input type="text" placeholder="Product Title" value={title} onChange={e => setTitle(e.target.value)} required />
+        <input type="number" placeholder="Price" value={price} onChange={e => setPrice(e.target.value)} required />
+        <input type="file" accept="image/*" multiple onChange={handleFileChange} />
 
         {images.length > 0 && (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {images.map((img, i) => (
-              <img
-                key={i}
-                src={URL.createObjectURL(img)}
-                alt="preview"
-                style={{
-                  width: 80,
-                  height: 80,
-                  objectFit: "cover",
-                  borderRadius: 6,
-                }}
-              />
+              <img key={i} src={URL.createObjectURL(img)} alt="preview" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 6 }} />
             ))}
           </div>
         )}
 
-        <button type="submit" disabled={loading}>
-          {loading ? "Adding..." : "Add Product"}
-        </button>
+        <button type="submit" disabled={loading}>{loading ? "Adding..." : "Add Product"}</button>
       </form>
 
       {message && <p style={{ marginTop: 10 }}>{message}</p>}

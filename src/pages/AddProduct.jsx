@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 
-// Cloudinary config
+// Cloudinary config from environment
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
@@ -13,6 +13,7 @@ export default function AddProduct() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
+  // get current user
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -27,29 +28,39 @@ export default function AddProduct() {
     setImages(files);
   };
 
-  // upload image to cloudinary
+  // upload single image to Cloudinary
   const uploadImage = async (file) => {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("upload_preset", UPLOAD_PRESET);
 
-    const res = await fetch(
-      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
-      {
-        method: "POST",
-        body: formData,
+    console.log("Uploading file:", file.name);
+    console.log("Cloud name:", CLOUD_NAME, "Preset:", UPLOAD_PRESET);
+
+    try {
+      const res = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      const data = await res.json();
+      console.log("Cloudinary response:", data);
+
+      if (!res.ok || !data.secure_url) {
+        throw new Error(data.error?.message || "Image upload failed");
       }
-    );
 
-    const data = await res.json();
-
-    if (!data.secure_url) {
-      throw new Error("Image upload failed");
+      return data.secure_url;
+    } catch (err) {
+      console.error("Upload error:", err);
+      throw new Error(err.message || "Image upload failed");
     }
-
-    return data.secure_url;
   };
 
+  // handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -89,32 +100,35 @@ export default function AddProduct() {
       // 2️⃣ upload images
       if (images.length > 0) {
         for (let i = 0; i < images.length; i++) {
-          const url = await uploadImage(images[i]);
+          try {
+            const url = await uploadImage(images[i]);
 
-          const { error: imageError } = await supabase
-            .from("product_images")
-            .insert([
-              {
-                product_id: product.id,
-                seller_id: userId,
-                image_url: url,
-                is_primary: i === 0,
-                position: i + 1,
-              },
-            ]);
+            const { error: imageError } = await supabase
+              .from("product_images")
+              .insert([
+                {
+                  product_id: product.id,
+                  seller_id: userId,
+                  image_url: url,
+                  is_primary: i === 0,
+                  position: i + 1,
+                },
+              ]);
 
-          if (imageError) throw imageError;
+            if (imageError) throw imageError;
+          } catch (imgErr) {
+            console.error("Failed to upload one image:", imgErr);
+            setMessage(`❌ Failed to upload image: ${images[i].name}`);
+          }
         }
       }
 
       setMessage("✅ Product added successfully!");
-
       setTitle("");
       setPrice("");
       setImages([]);
-
     } catch (err) {
-      console.error(err);
+      console.error("Submit error:", err);
       setMessage("❌ " + err.message);
     }
 

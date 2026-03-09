@@ -6,29 +6,35 @@ export default function Home() {
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    const fetchProducts = async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select(`
-          id, title, price,
-          product_images!inner(image_url, is_primary)
-        `)
-        .eq("marketplace_type", "marketplace")
-        .eq("status", "active")
-        .order("created_at", { ascending: false });
-
-      if (error) console.error("Error fetching products:", error);
-      else setProducts(data || []);
-    };
     fetchProducts();
   }, []);
+
+  async function fetchProducts() {
+    const { data, error } = await supabase
+      .from("products")
+      .select(`
+        id,
+        title,
+        price,
+        product_images(image_url)
+      `)
+      .eq("marketplace_type", "marketplace")
+      .eq("status", "active")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.log(error);
+    } else {
+      setProducts(data || []);
+    }
+  }
 
   const filtered = products.filter((p) =>
     (p.title || "").toLowerCase().includes(search.toLowerCase())
   );
 
   return (
-    <div style={{ padding: 20, maxWidth: 800, margin: "0 auto" }}>
+    <div style={{ maxWidth: 900, margin: "40px auto", padding: "20px" }}>
       <h1>Marketplace</h1>
 
       <input
@@ -36,40 +42,69 @@ export default function Home() {
         placeholder="Search products..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        style={{ width: "100%", padding: 8, marginBottom: 16 }}
+        style={{
+          width: "100%",
+          padding: "10px",
+          marginBottom: "20px",
+        }}
       />
 
       {filtered.length === 0 && <p>No products found.</p>}
 
-      {filtered.map((p) => {
-        const primaryImage = p.product_images?.find((img) => img.is_primary);
-        return (
-          <div
-            key={p.id}
-            style={{
-              border: "1px solid #ddd",
-              padding: 16,
-              marginBottom: 12,
-              borderRadius: 8,
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-            }}
-          >
-            {primaryImage && (
-              <img
-                src={primaryImage.image_url}
-                alt={p.title || "Product"}
-                style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 6 }}
-              />
-            )}
-            <div>
-              <h3>{p.title || "Untitled Product"}</h3>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))",
+          gap: "20px",
+        }}
+      >
+        {filtered.map((p) => {
+          const image = p.product_images?.[0]?.image_url;
+
+          return (
+            <div
+              key={p.id}
+              style={{
+                border: "1px solid #ddd",
+                borderRadius: "8px",
+                padding: "10px",
+              }}
+            >
+              {image ? (
+                <img
+                  src={image}
+                  alt={p.title}
+                  style={{
+                    width: "100%",
+                    height: "150px",
+                    objectFit: "cover",
+                    borderRadius: "6px",
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    height: "150px",
+                    background: "#f2f2f2",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: "6px",
+                  }}
+                >
+                  No Image
+                </div>
+              )}
+
+              <h3 style={{ marginTop: "10px" }}>
+                {p.title || "Untitled Product"}
+              </h3>
+
               <p>₦{Number(p.price).toLocaleString()}</p>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }

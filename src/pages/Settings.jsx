@@ -1,3 +1,4 @@
+
 // src/pages/Settings.jsx
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
@@ -21,7 +22,11 @@ export default function Settings({ session }) {
       .select("id,title,price")
       .eq("seller_id", userId)
       .order("created_at", { ascending: false });
-    if (productsError) { console.error(productsError); setLoading(false); return; }
+    if (productsError) { 
+      console.error(productsError); 
+      setLoading(false); 
+      return; 
+    }
 
     const { data: imagesData, error: imagesError } = await supabase
       .from("product_images")
@@ -33,7 +38,9 @@ export default function Settings({ session }) {
     setLoading(false);
   };
 
-  useEffect(() => { if(userId) fetchProducts(); }, [userId]);
+  useEffect(() => { 
+    if(userId) fetchProducts(); 
+  }, [userId]);
 
   const getImage = (productId) => images.find(i => i.product_id === productId && i.is_primary);
 
@@ -63,35 +70,101 @@ export default function Settings({ session }) {
       fetchProducts();
     } catch(err) {
       console.error(err);
-      setMessage("❌ Delete failed: "+err.message);
+      setMessage("❌ Delete failed: " + err.message);
     }
   };
 
   return (
-    <div style={{ maxWidth: 700, margin: "40px auto" }}>
+    <div style={{ maxWidth: 900, margin: "40px auto", padding: 20 }}>
       <h2>My Products</h2>
-      {message && <p style={{ marginBottom: 12 }}>{message}</p>}
-      {loading ? <p>Loading your products...</p> :
-        products.length === 0 ? <p>No products found.</p> :
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {message && <p style={{ marginBottom: 12, padding: 8, background: "#f0f9ff", borderRadius: 6, borderLeft: "3px solid #3b82f6" }}>{message}</p>}
+      
+      {loading ? (
+        <p style={{ textAlign: "center", padding: "40px", fontSize: "1.1em" }}>Loading your products...</p>
+      ) : products.length === 0 ? (
+        <p style={{ textAlign: "center", padding: "40px", color: "#666", fontSize: "1.1em" }}>No products found. <a href="/add" style={{ color: "#3b82f6", textDecoration: "none" }}>Add your first product →</a></p>
+      ) : (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))",
+            gap: "20px"
+          }}
+        >
           {products.map(product => {
             const image = getImage(product.id);
             return (
-              <div key={product.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:12,border:"1px solid #ddd",borderRadius:6}}>
-                <div style={{display:"flex",alignItems:"center",gap:12}}>
-                  {image ? <img src={getImageUrl(image.public_id)} alt={product.title || "Untitled"} style={{width:80,height:80,objectFit:"cover",borderRadius:6}}/>
-                    : <div style={{width:80,height:80,background:"#f3f3f3",display:"flex",alignItems:"center",justifyContent:"center",borderRadius:6,fontSize:12,color:"#999"}}>No Image</div>}
-                  <div>
-                    <strong>{product.title || "Untitled Product"}</strong>
-                    <p>₦{Number(product.price).toLocaleString()}</p>
+              <div
+                key={product.id}
+                style={{
+                  border: "1px solid #ddd",
+                  borderRadius: "8px",
+                  padding: "10px",
+                  background: "#fff",
+                  boxShadow: "0 2px 4px rgba(0,0,0,0.05)"
+                }}
+              >
+                {image ? (
+                  <img
+                    src={getImageUrl(image.public_id)}
+                    alt={product.title || "Product"}
+                    style={{
+                      width: "100%",
+                      height: "150px",
+                      objectFit: "cover",
+                      borderRadius: "6px",
+                      marginBottom: "10px"
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      height: "150px",
+                      background: "#f3f3f3",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: "6px",
+                      marginBottom: "10px",
+                      color: "#999",
+                      fontSize: "0.9em"
+                    }}
+                  >
+                    No Image
                   </div>
-                </div>
-                <button style={{background:"#ff4d4f",color:"#fff",border:"none",padding:"6px 12px",borderRadius:4,cursor:"pointer"}} onClick={()=>handleDelete(product.id)}>Delete</button>
+                )}
+
+                <h3 style={{ margin: "0 0 8px 0", fontSize: "1.1em" }}>
+                  {product.title || "Untitled Product"}
+                </h3>
+
+                <p style={{ margin: "0 0 12px 0", fontSize: "1.2em", fontWeight: 600, color: "#059669" }}>
+                  ₦{Number(product.price).toLocaleString()}
+                </p>
+
+                <button 
+                  style={{ 
+                    width: "100%", 
+                    background: "#ef4444", 
+                    color: "#fff", 
+                    border: "none", 
+                    padding: "8px 12px", 
+                    borderRadius: "6px", 
+                    cursor: "pointer",
+                    fontWeight: 500,
+                    transition: "background 0.2s"
+                  }} 
+                  onClick={() => handleDelete(product.id)}
+                  onMouseEnter={(e) => e.target.style.background = "#dc2626"}
+                  onMouseLeave={(e) => e.target.style.background = "#ef4444"}
+                >
+                  Delete Product
+                </button>
               </div>
             );
           })}
         </div>
-      }
+      )}
     </div>
   );
 }

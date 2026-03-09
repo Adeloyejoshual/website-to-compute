@@ -14,7 +14,7 @@ export default function Settings({ session }) {
   const fetchProducts = async () => {
     setLoading(true);
 
-    // 1️⃣ Load products
+    // Load products
     const { data: productsData, error: productsError } = await supabase
       .from("products")
       .select("id,title,price")
@@ -28,10 +28,10 @@ export default function Settings({ session }) {
       return;
     }
 
-    // 2️⃣ Load images
+    // Load images
     const { data: imagesData, error: imagesError } = await supabase
       .from("product_images")
-      .select("product_id,image_url,is_primary");
+      .select("id,product_id,image_url,is_primary");
 
     if (imagesError) {
       console.error(imagesError);
@@ -52,34 +52,52 @@ export default function Settings({ session }) {
     return img?.image_url;
   };
 
-  // Delete a product and its images
+  // Delete a product and its images (Supabase + Cloudinary)
   const handleDelete = async (productId) => {
     if (!confirm("Are you sure you want to delete this product?")) return;
 
-    // Delete images first
-    const { error: imgError } = await supabase
-      .from("product_images")
-      .delete()
-      .eq("product_id", productId);
+    try {
+      // 1️⃣ Get all image public IDs for this product
+      const productImages = images.filter((i) => i.product_id === productId);
+      const publicIds = productImages.map((img) => {
+        // Extract Cloudinary public_id from URL
+        // Example URL: https://res.cloudinary.com/<cloud>/image/upload/v12345/abc.jpg
+        const parts = img.image_url.split("/");
+        const lastPart = parts[parts.length - 1]; // abc.jpg
+        const publicId = lastPart.split(".")[0]; // abc
+        return publicId;
+      });
 
-    if (imgError) {
-      console.error(imgError);
-      setMessage("❌ Failed to delete images: " + imgError.message);
-      return;
-    }
+      // 2️⃣ Call backend endpoint to delete images from Cloudinary
+      if (publicIds.length > 0) {
+        await fetch("https://your-backend.com/delete-product-images", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ publicIds }),
+        });
+      }
 
-    // Delete product
-    const { error } = await supabase
-      .from("products")
-      .delete()
-      .eq("id", productId);
+      // 3️⃣ Delete images from Supabase
+      const { error: imgError } = await supabase
+        .from("product_images")
+        .delete()
+        .eq("product_id", productId);
 
-    if (error) {
-      console.error(error);
-      setMessage("❌ Failed to delete product: " + error.message);
-    } else {
-      setMessage("✅ Product deleted successfully!");
-      fetchProducts(); // Refresh list
+      if (imgError) throw imgError;
+
+      // 4️⃣ Delete product
+      const { error } = await supabase
+        .from("products")
+        .delete()
+        .eq("id", productId);
+
+      if (error) throw error;
+
+      setMessage("✅ Product and images deleted successfully!");
+      fetchProducts(); // refresh list
+    } catch (err) {
+      console.error(err);
+      setMessage("❌ Delete failed: " + err.message);
     }
   };
 

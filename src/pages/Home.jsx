@@ -1,40 +1,56 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
-export default function Home() {
+export default function HomePage() {
   const [products, setProducts] = useState([]);
+  const [images, setImages] = useState([]);
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    fetchProducts();
+    loadData();
   }, []);
 
-  async function fetchProducts() {
-    const { data, error } = await supabase
+  async function loadData() {
+    // Load products
+    const { data: productsData, error: productsError } = await supabase
       .from("products")
-      .select(`
-        id,
-        title,
-        price,
-        product_images(image_url)
-      `)
+      .select("id,title,price")
       .eq("marketplace_type", "marketplace")
       .eq("status", "active")
       .order("created_at", { ascending: false });
 
-    if (error) {
-      console.log(error);
-    } else {
-      setProducts(data || []);
+    if (productsError) {
+      console.log(productsError);
+      return;
     }
+
+    // Load images
+    const { data: imagesData, error: imagesError } = await supabase
+      .from("product_images")
+      .select("product_id,image_url,is_primary");
+
+    if (imagesError) {
+      console.log(imagesError);
+      return;
+    }
+
+    setProducts(productsData || []);
+    setImages(imagesData || []);
   }
 
-  const filtered = products.filter((p) =>
+  function getImage(productId) {
+    const img = images.find(
+      (i) => i.product_id === productId && i.is_primary
+    );
+    return img?.image_url;
+  }
+
+  const filteredProducts = products.filter((p) =>
     (p.title || "").toLowerCase().includes(search.toLowerCase())
   );
 
   return (
-    <div style={{ maxWidth: 900, margin: "40px auto", padding: "20px" }}>
+    <div style={{ maxWidth: 900, margin: "40px auto", padding: 20 }}>
       <h1>Marketplace</h1>
 
       <input
@@ -46,50 +62,53 @@ export default function Home() {
           width: "100%",
           padding: "10px",
           marginBottom: "20px",
+          borderRadius: "6px",
+          border: "1px solid #ccc"
         }}
       />
 
-      {filtered.length === 0 && <p>No products found.</p>}
+      {filteredProducts.length === 0 && <p>No products found.</p>}
 
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))",
-          gap: "20px",
+          gap: "20px"
         }}
       >
-        {filtered.map((p) => {
-          const image = p.product_images?.[0]?.image_url;
+        {filteredProducts.map((product) => {
+          const image = getImage(product.id);
 
           return (
             <div
-              key={p.id}
+              key={product.id}
               style={{
                 border: "1px solid #ddd",
                 borderRadius: "8px",
                 padding: "10px",
+                background: "#fff"
               }}
             >
               {image ? (
                 <img
                   src={image}
-                  alt={p.title}
+                  alt={product.title}
                   style={{
                     width: "100%",
                     height: "150px",
                     objectFit: "cover",
-                    borderRadius: "6px",
+                    borderRadius: "6px"
                   }}
                 />
               ) : (
                 <div
                   style={{
                     height: "150px",
-                    background: "#f2f2f2",
+                    background: "#f3f3f3",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    borderRadius: "6px",
+                    borderRadius: "6px"
                   }}
                 >
                   No Image
@@ -97,10 +116,10 @@ export default function Home() {
               )}
 
               <h3 style={{ marginTop: "10px" }}>
-                {p.title || "Untitled Product"}
+                {product.title || "Untitled Product"}
               </h3>
 
-              <p>₦{Number(p.price).toLocaleString()}</p>
+              <p>₦{Number(product.price).toLocaleString()}</p>
             </div>
           );
         })}

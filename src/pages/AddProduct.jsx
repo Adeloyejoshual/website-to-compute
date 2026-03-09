@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 
-// Cloudinary config from .env
+// Cloudinary config
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
@@ -13,21 +13,21 @@ export default function AddProduct() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  // Get logged-in user
   useEffect(() => {
-    const fetchUser = async () => {
+    const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) setUserId(user.id);
     };
-    fetchUser();
+    getUser();
   }, []);
 
-  // Handle multiple files
+  // handle image selection
   const handleFileChange = (e) => {
-    setImages(Array.from(e.target.files));
+    const files = Array.from(e.target.files);
+    setImages(files);
   };
 
-  // Upload to Cloudinary
+  // upload image to cloudinary
   const uploadImage = async (file) => {
     const formData = new FormData();
     formData.append("file", file);
@@ -35,27 +35,44 @@ export default function AddProduct() {
 
     const res = await fetch(
       `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
-      { method: "POST", body: formData }
+      {
+        method: "POST",
+        body: formData,
+      }
     );
+
     const data = await res.json();
+
+    if (!data.secure_url) {
+      throw new Error("Image upload failed");
+    }
+
     return data.secure_url;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!userId) return setMessage("❌ Please log in first.");
-    if (!title || !price) return setMessage("❌ Title and Price are required.");
+
+    if (!userId) {
+      setMessage("❌ Please log in first");
+      return;
+    }
+
+    if (!title || !price) {
+      setMessage("❌ Title and Price are required");
+      return;
+    }
 
     setLoading(true);
     setMessage("");
 
     try {
-      // 1️⃣ Insert product
+      // 1️⃣ create product
       const { data: product, error } = await supabase
         .from("products")
         .insert([
           {
-            title,              // use title
+            title,
             price: Number(price),
             seller_id: userId,
             seller_type: "public",
@@ -69,23 +86,33 @@ export default function AddProduct() {
 
       if (error) throw error;
 
-      // 2️⃣ Upload images
-      for (let i = 0; i < images.length; i++) {
-        const url = await uploadImage(images[i]);
-        await supabase.from("product_images").insert([
-          {
-            product_id: product.id,
-            image_url: url,
-            is_primary: i === 0,
-            position: i + 1,
-          },
-        ]);
+      // 2️⃣ upload images
+      if (images.length > 0) {
+        for (let i = 0; i < images.length; i++) {
+          const url = await uploadImage(images[i]);
+
+          const { error: imageError } = await supabase
+            .from("product_images")
+            .insert([
+              {
+                product_id: product.id,
+                seller_id: userId,
+                image_url: url,
+                is_primary: i === 0,
+                position: i + 1,
+              },
+            ]);
+
+          if (imageError) throw imageError;
+        }
       }
 
       setMessage("✅ Product added successfully!");
+
       setTitle("");
       setPrice("");
       setImages([]);
+
     } catch (err) {
       console.error(err);
       setMessage("❌ " + err.message);
@@ -97,7 +124,11 @@ export default function AddProduct() {
   return (
     <div style={{ maxWidth: 450, margin: "40px auto" }}>
       <h2>Add Product</h2>
-      <form style={{ display: "flex", flexDirection: "column", gap: 12 }} onSubmit={handleSubmit}>
+
+      <form
+        onSubmit={handleSubmit}
+        style={{ display: "flex", flexDirection: "column", gap: 12 }}
+      >
         <input
           type="text"
           placeholder="Product Title"
@@ -105,6 +136,7 @@ export default function AddProduct() {
           onChange={(e) => setTitle(e.target.value)}
           required
         />
+
         <input
           type="number"
           placeholder="Price"
@@ -112,16 +144,27 @@ export default function AddProduct() {
           onChange={(e) => setPrice(e.target.value)}
           required
         />
-        <input type="file" accept="image/*" multiple onChange={handleFileChange} />
+
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handleFileChange}
+        />
 
         {images.length > 0 && (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {images.map((img, idx) => (
+            {images.map((img, i) => (
               <img
-                key={idx}
+                key={i}
                 src={URL.createObjectURL(img)}
-                alt={`preview-${idx}`}
-                style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 6 }}
+                alt="preview"
+                style={{
+                  width: 80,
+                  height: 80,
+                  objectFit: "cover",
+                  borderRadius: 6,
+                }}
               />
             ))}
           </div>

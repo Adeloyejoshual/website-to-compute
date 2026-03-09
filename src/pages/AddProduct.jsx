@@ -1,3 +1,4 @@
+// src/pages/AddProduct.jsx
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 
@@ -7,7 +8,7 @@ export default function AddProduct() {
   const [price, setPrice] = useState("");
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [toast, setToast] = useState(null);
+  const [message, setMessage] = useState("");
 
   // Get logged-in user
   useEffect(() => {
@@ -18,94 +19,71 @@ export default function AddProduct() {
     fetchUser();
   }, []);
 
-  // Handle multiple files
-  const handleFileChange = (e) => {
-    setImages(Array.from(e.target.files));
-  };
-
   // Convert file to base64
-  const fileToBase64 = (file) =>
+  const toBase64 = (file) =>
     new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => resolve(reader.result);
-      reader.onerror = (err) => reject(err);
+      reader.onerror = (error) => reject(error);
     });
 
-  // Upload to serverless API
+  // Handle file selection
+  const handleFileChange = (e) => setImages(Array.from(e.target.files));
+
+  // Upload image via server API
   const uploadImage = async (file) => {
-    const base64 = await fileToBase64(file);
+    const base64 = await toBase64(file);
     const res = await fetch("/api/uploadImage", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ base64 }),
     });
     const data = await res.json();
-    if (res.status !== 200) throw new Error(data.error || "Upload failed");
+    if (data.error) throw new Error(data.error);
     return data.url;
   };
 
-  // Show toast helper
-  const showToast = (message, type = "success", duration = 3000) => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), duration);
-  };
-
+  // Submit product
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!userId) return showToast("❌ Please log in first.", "error");
-    if (!title.trim() || !price) return showToast("❌ Title and Price are required.", "error");
+    if (!userId) return setMessage("❌ Please log in first.");
+    if (!title || !price) return setMessage("❌ Title and Price required.");
 
     setLoading(true);
+    setMessage("");
 
     try {
-      // Insert product
+      // 1️⃣ Insert product
       const { data: product, error } = await supabase
         .from("products")
-        .insert([{
-          title: title.trim(),
-          price: Number(price),
-          seller_id: userId,
-          seller_type: "public",
-          marketplace_type: "marketplace",
-          status: "active",
-          stock: 1,
-        }])
+        .insert([{ title, price: Number(price), seller_id: userId }])
         .select()
         .single();
       if (error) throw error;
 
-      // Upload all images in parallel
-      const urls = await Promise.all(images.map(uploadImage));
+      // 2️⃣ Upload images via API and insert into Supabase
+      for (let i = 0; i < images.length; i++) {
+        const url = await uploadImage(images[i]);
+        await supabase.from("product_images").insert([{
+          product_id: product.id,
+          image_url: url,
+          is_primary: i === 0,
+          position: i + 1,
+        }]);
+      }
 
-      // Insert image records
-      await Promise.all(
-        urls.map((url, i) =>
-          supabase.from("product_images").insert({
-            product_id: product.id,
-            image_url: url,
-            is_primary: i === 0,
-            position: i + 1,
-          })
-        )
-      );
-
-      showToast("✅ Product added successfully!");
+      setMessage("✅ Product added successfully!");
       setTitle("");
       setPrice("");
       setImages([]);
     } catch (err) {
       console.error(err);
-      showToast("❌ " + err.message, "error");
+      setMessage("❌ " + err.message);
     }
 
     setLoading(false);
   };
-
-  // Cleanup object URLs
-  useEffect(() => {
-    return () => images.forEach((img) => URL.revokeObjectURL(img));
-  }, [images]);
 
   return (
     <div style={{ maxWidth: 450, margin: "40px auto" }}>
@@ -125,9 +103,10 @@ export default function AddProduct() {
           onChange={(e) => setPrice(e.target.value)}
           required
         />
+
         <input type="file" accept="image/*" multiple onChange={handleFileChange} />
 
-        {/* Preview images */}
+        {/* Preview selected images */}
         {images.length > 0 && (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {images.map((img, idx) => (
@@ -146,24 +125,7 @@ export default function AddProduct() {
         </button>
       </form>
 
-      {/* Toast notification */}
-      {toast && (
-        <div
-          style={{
-            position: "fixed",
-            top: 20,
-            right: 20,
-            background: toast.type === "success" ? "#52c41a" : "#ff4d4f",
-            color: "#fff",
-            padding: "12px 20px",
-            borderRadius: 6,
-            boxShadow: "0 4px 6px rgba(0,0,0,0.2)",
-            zIndex: 10000,
-          }}
-        >
-          {toast.message}
-        </div>
-      )}
+      {message && <p style={{ marginTop: 10 }}>{message}</p>}
     </div>
   );
 }

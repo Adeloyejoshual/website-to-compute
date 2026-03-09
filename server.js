@@ -1,71 +1,62 @@
+// server.js
+import express from "express";
+import bodyParser from "body-parser";
+import { v2 as cloudinary } from "cloudinary";
+import cors from "cors";
 
-// COMPLETE SERVER CODE - Deploy this to fix Cloudinary deletion
-require("dotenv").config();
-const express = require("express");
-const cloudinary = require("cloudinary").v2;
-const bodyParser = require("body-parser");
-const cors = require("cors");
-
+// Initialize Express
 const app = express();
 
-// Middleware
-app.use(cors());  // ✅ Allow frontend requests
+// Middlewares
 app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(cors()); // Allow your frontend domain if needed
 
-// Cloudinary config (auto from CLOUDINARY_URL)
-console.log("✅ Cloudinary configured");
-
-// ✅ ENDPOINT 1: Multiple images (for Settings page)
-app.post("/delete-product-images", async (req, res) => {
-  console.log("📥 Delete request:", req.body);
-  
-  try {
-    const { publicIds } = req.body;
-    
-    if (!publicIds || !Array.isArray(publicIds) || publicIds.length === 0) {
-      console.log("❌ No publicIds provided");
-      return res.status(400).json({ error: "publicIds array required" });
-    }
-
-    const result = await cloudinary.api.delete_resources(publicIds, {
-      resource_type: "image"
-    });
-    
-    console.log("✅ Cloudinary deleted:", result);
-    res.json({ 
-      success: true, 
-      deleted_count: result.deleted_count || 0,
-      result 
-    });
-  } catch (err) {
-    console.error("❌ Cloudinary ERROR:", err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ✅ ENDPOINT 2: Single image (keep your original)
-app.post("/delete-image", async (req, res) => {
-  try {
-    const { publicId } = req.body;
-    if (!publicId) return res.status(400).json({ error: "publicId is required" });
-
-    const result = await cloudinary.uploader.destroy(publicId);
-    console.log("✅ Single image deleted:", result);
-    res.json({ success: true, result });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
+// Cloudinary config - use environment variables
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
 // Health check
-app.get("/", (req, res) => {
-  res.json({ status: "Server running ✅", endpoints: ["/delete-product-images", "/delete-image"] });
+app.get("/", (req, res) => res.send("Cloudinary server running"));
+
+// Delete multiple product images
+app.post("/delete-product-images", async (req, res) => {
+  const { publicIds } = req.body;
+
+  if (!Array.isArray(publicIds) || publicIds.length === 0) {
+    return res.status(400).json({ error: "Invalid publicIds" });
+  }
+
+  try {
+    // Delete images from Cloudinary
+    const result = await cloudinary.api.delete_resources(publicIds);
+    console.log("Deleted images:", publicIds);
+    res.status(200).json({ message: "Images deleted", result });
+  } catch (err) {
+    console.error("Cloudinary deletion error:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
-const PORT = process.env.PORT || 5000;
+// Optional: Delete a single image
+app.post("/delete-single-image", async (req, res) => {
+  const { publicId } = req.body;
+  if (!publicId) return res.status(400).json({ error: "Missing publicId" });
+
+  try {
+    const result = await cloudinary.uploader.destroy(publicId);
+    console.log("Deleted single image:", publicId);
+    res.status(200).json({ message: "Image deleted", result });
+  } catch (err) {
+    console.error("Cloudinary deletion error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Start server
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📡 Endpoints: POST /delete-product-images, POST /delete-image`);
+  console.log(`Cloudinary server running on port ${PORT}`);
 });

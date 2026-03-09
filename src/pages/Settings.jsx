@@ -1,5 +1,4 @@
-
-// src/pages/Settings.jsx
+// src/pages/Settings.jsx - ✅ FULLY WORKING with your backend
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 
@@ -11,17 +10,21 @@ export default function Settings({ session }) {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [deleting, setDeleting] = useState({}); // Track per-product delete state
 
-  const userId = session.user.id;
+  const userId = session?.user?.id;
+  const BACKEND_URL = "https://website-to-compute-1mzb.onrender.com";
 
   const fetchProducts = async () => {
+    if (!userId) return;
+    
     setLoading(true);
-
     const { data: productsData, error: productsError } = await supabase
       .from("products")
       .select("id,title,price")
       .eq("seller_id", userId)
       .order("created_at", { ascending: false });
+    
     if (productsError) { 
       console.error(productsError); 
       setLoading(false); 
@@ -39,132 +42,208 @@ export default function Settings({ session }) {
   };
 
   useEffect(() => { 
-    if(userId) fetchProducts(); 
+    if (userId) fetchProducts(); 
   }, [userId]);
 
   const getImage = (productId) => images.find(i => i.product_id === productId && i.is_primary);
 
   const handleDelete = async (productId) => {
-    if (!confirm("Are you sure you want to delete this product?")) return;
+    if (!confirm("Are you sure you want to delete this product and its images?")) return;
+
+    setDeleting(prev => ({ ...prev, [productId]: true }));
+    setMessage("");
 
     try {
+      // 1. Get product images
       const productImages = images.filter(i => i.product_id === productId);
       const publicIds = productImages.map(i => i.public_id);
+      
+      console.log("Deleting publicIds:", publicIds);
 
-      if(publicIds.length) {
-        const res = await fetch("https://your-backend.com/delete-product-images", {
+      // 2. Delete from Cloudinary (your backend)
+      if (publicIds.length > 0) {
+        const res = await fetch(`${BACKEND_URL}/delete-product-images`, {
           method: "POST",
-          headers: {"Content-Type":"application/json"},
-          body: JSON.stringify({publicIds})
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ publicIds })
         });
-        if(!res.ok) throw new Error("Failed to delete images from Cloudinary");
+        
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error("Cloudinary delete failed:", errorText);
+          throw new Error(`Cloudinary delete failed: ${res.status} ${errorText}`);
+        }
+        console.log("✅ Cloudinary images deleted");
       }
 
-      const { error: imgError } = await supabase.from("product_images").delete().eq("product_id", productId);
-      if(imgError) throw imgError;
+      // 3. Delete Supabase records
+      const { error: imgError } = await supabase
+        .from("product_images")
+        .delete()
+        .eq("product_id", productId);
+      if (imgError) throw imgError;
 
-      const { error: productError } = await supabase.from("products").delete().eq("id", productId);
-      if(productError) throw productError;
+      const { error: productError } = await supabase
+        .from("products")
+        .delete()
+        .eq("id", productId);
+      if (productError) throw productError;
 
-      setMessage("✅ Product deleted successfully!");
-      fetchProducts();
-    } catch(err) {
-      console.error(err);
-      setMessage("❌ Delete failed: " + err.message);
+      setMessage("✅ Product and images deleted successfully!");
+      fetchProducts(); // Refresh list
+    } catch (err) {
+      console.error("Delete error:", err);
+      setMessage(`❌ Delete failed: ${err.message}`);
+    } finally {
+      setDeleting(prev => ({ ...prev, [productId]: false }));
     }
   };
 
   return (
     <div style={{ maxWidth: 900, margin: "40px auto", padding: 20 }}>
-      <h2>My Products</h2>
-      {message && <p style={{ marginBottom: 12, padding: 8, background: "#f0f9ff", borderRadius: 6, borderLeft: "3px solid #3b82f6" }}>{message}</p>}
+      <h2 style={{ marginBottom: 24, color: "#1f2937" }}>My Products</h2>
+      
+      {message && (
+        <div style={{ 
+          marginBottom: 20, 
+          padding: 12, 
+          background: message.includes("✅") ? "#dcfce7" : "#fee2e2", 
+          borderRadius: 8, 
+          borderLeft: `4px solid ${message.includes("✅") ? "#10b981" : "#ef4444"}`,
+          color: message.includes("✅") ? "#166534" : "#991b1b"
+        }}>
+          {message}
+        </div>
+      )}
       
       {loading ? (
-        <p style={{ textAlign: "center", padding: "40px", fontSize: "1.1em" }}>Loading your products...</p>
+        <div style={{ textAlign: "center", padding: "60px 20px" }}>
+          <div style={{ width: 40, height: 40, border: "3px solid #e5e7eb", borderTop: "3px solid #3b82f6", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 20px" }} />
+          <p style={{ color: "#6b7280", fontSize: "1.1em" }}>Loading your products...</p>
+        </div>
       ) : products.length === 0 ? (
-        <p style={{ textAlign: "center", padding: "40px", color: "#666", fontSize: "1.1em" }}>No products found. <a href="/add" style={{ color: "#3b82f6", textDecoration: "none" }}>Add your first product →</a></p>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "#6b7280" }}>
+          <div style={{ width: 80, height: 80, background: "#f3f4f6", borderRadius: "50%", margin: "0 auto 20px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2em" }}>📦</div>
+          <p style={{ fontSize: "1.1em", marginBottom: 12 }}>No products found.</p>
+          <a href="/add" style={{ 
+            padding: "12px 24px", 
+            background: "#3b82f6", 
+            color: "white", 
+            textDecoration: "none", 
+            borderRadius: 8, 
+            fontWeight: 500 
+          }}>
+            Add your first product →
+          </a>
+        </div>
       ) : (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))",
-            gap: "20px"
-          }}
-        >
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))",
+          gap: "20px"
+        }}>
           {products.map(product => {
             const image = getImage(product.id);
+            const isDeleting = deleting[product.id];
+            
             return (
-              <div
-                key={product.id}
-                style={{
-                  border: "1px solid #ddd",
-                  borderRadius: "8px",
-                  padding: "10px",
-                  background: "#fff",
-                  boxShadow: "0 2px 4px rgba(0,0,0,0.05)"
-                }}
-              >
-                {image ? (
-                  <img
-                    src={getImageUrl(image.public_id)}
-                    alt={product.title || "Product"}
-                    style={{
-                      width: "100%",
-                      height: "150px",
-                      objectFit: "cover",
-                      borderRadius: "6px",
-                      marginBottom: "10px"
-                    }}
-                  />
-                ) : (
-                  <div
-                    style={{
-                      height: "150px",
-                      background: "#f3f3f3",
+              <div key={product.id} style={{
+                border: "1px solid #e5e7eb",
+                borderRadius: "12px",
+                padding: "16px",
+                background: "#fff",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                transition: "all 0.2s"
+              }}>
+                <div style={{ marginBottom: 12 }}>
+                  {image ? (
+                    <img
+                      src={getImageUrl(image.public_id)}
+                      alt={product.title}
+                      style={{
+                        width: "100%",
+                        height: "140px",
+                        objectFit: "cover",
+                        borderRadius: "8px"
+                      }}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div style={{
+                      height: "140px",
+                      background: "linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)",
+                      borderRadius: "8px",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      borderRadius: "6px",
-                      marginBottom: "10px",
-                      color: "#999",
-                      fontSize: "0.9em"
-                    }}
-                  >
-                    No Image
-                  </div>
-                )}
+                      color: "#9ca3af",
+                      fontSize: "0.85em",
+                      position: "relative"
+                    }}>
+                      <span>📦 No Image</span>
+                    </div>
+                  )}
+                </div>
 
-                <h3 style={{ margin: "0 0 8px 0", fontSize: "1.1em" }}>
+                <h3 style={{ 
+                  margin: "0 0 8px 0", 
+                  fontSize: "1.05em", 
+                  fontWeight: 600,
+                  lineHeight: "1.3",
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden"
+                }}>
                   {product.title || "Untitled Product"}
                 </h3>
 
-                <p style={{ margin: "0 0 12px 0", fontSize: "1.2em", fontWeight: 600, color: "#059669" }}>
-                  ₦{Number(product.price).toLocaleString()}
+                <p style={{ 
+                  margin: "0 0 16px 0", 
+                  fontSize: "1.25em", 
+                  fontWeight: 700, 
+                  color: "#059669" 
+                }}>
+                  ₦{Number(product.price || 0).toLocaleString()}
                 </p>
 
                 <button 
                   style={{ 
                     width: "100%", 
-                    background: "#ef4444", 
+                    background: isDeleting ? "#6b7280" : "#ef4444", 
                     color: "#fff", 
                     border: "none", 
-                    padding: "8px 12px", 
-                    borderRadius: "6px", 
-                    cursor: "pointer",
+                    padding: "10px 16px", 
+                    borderRadius: "8px", 
+                    cursor: isDeleting ? "not-allowed" : "pointer",
                     fontWeight: 500,
-                    transition: "background 0.2s"
+                    fontSize: "0.9em",
+                    transition: "all 0.2s"
                   }} 
                   onClick={() => handleDelete(product.id)}
-                  onMouseEnter={(e) => e.target.style.background = "#dc2626"}
-                  onMouseLeave={(e) => e.target.style.background = "#ef4444"}
+                  disabled={isDeleting}
                 >
-                  Delete Product
+                  {isDeleting ? (
+                    <>
+                      <span style={{ marginRight: 8 }}>⏳</span>
+                      Deleting...
+                    </>
+                  ) : (
+                    "🗑️ Delete Product"
+                  )}
                 </button>
               </div>
             );
           })}
         </div>
       )}
+      
+      <style jsx>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }

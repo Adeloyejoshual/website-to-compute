@@ -10,7 +10,7 @@ export default function Settings({ session }) {
 
   const userId = session.user.id;
 
-  // Fetch user's products and their images
+  // Fetch user's products and images
   const fetchProducts = async () => {
     setLoading(true);
 
@@ -52,29 +52,34 @@ export default function Settings({ session }) {
     return img?.image_url;
   };
 
-  // Delete a product and its images (Supabase + Cloudinary)
+  // Delete product + images from Supabase and Cloudinary
   const handleDelete = async (productId) => {
     if (!confirm("Are you sure you want to delete this product?")) return;
 
     try {
-      // 1️⃣ Get all image public IDs for this product
+      // 1️⃣ Get Cloudinary public IDs for this product
       const productImages = images.filter((i) => i.product_id === productId);
       const publicIds = productImages.map((img) => {
-        // Extract Cloudinary public_id from URL
-        // Example URL: https://res.cloudinary.com/<cloud>/image/upload/v12345/abc.jpg
         const parts = img.image_url.split("/");
-        const lastPart = parts[parts.length - 1]; // abc.jpg
-        const publicId = lastPart.split(".")[0]; // abc
-        return publicId;
+        const lastPart = parts[parts.length - 1]; // e.g., abc.jpg
+        return lastPart.split(".")[0]; // e.g., abc
       });
 
       // 2️⃣ Call backend endpoint to delete images from Cloudinary
       if (publicIds.length > 0) {
-        await fetch("https://your-backend.com/delete-product-images", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ publicIds }),
-        });
+        const res = await fetch(
+          "https://website-to-compute-1mzb.onrender.com/delete-product-images",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ publicIds }),
+          }
+        );
+
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || "Failed to delete images from Cloudinary");
+        }
       }
 
       // 3️⃣ Delete images from Supabase
@@ -82,19 +87,14 @@ export default function Settings({ session }) {
         .from("product_images")
         .delete()
         .eq("product_id", productId);
-
       if (imgError) throw imgError;
 
-      // 4️⃣ Delete product
-      const { error } = await supabase
-        .from("products")
-        .delete()
-        .eq("id", productId);
-
+      // 4️⃣ Delete product from Supabase
+      const { error } = await supabase.from("products").delete().eq("id", productId);
       if (error) throw error;
 
       setMessage("✅ Product and images deleted successfully!");
-      fetchProducts(); // refresh list
+      fetchProducts(); // Refresh list
     } catch (err) {
       console.error(err);
       setMessage("❌ Delete failed: " + err.message);
@@ -104,7 +104,6 @@ export default function Settings({ session }) {
   return (
     <div style={{ maxWidth: 700, margin: "40px auto" }}>
       <h2>My Products</h2>
-
       {message && <p style={{ marginBottom: 12 }}>{message}</p>}
 
       {loading ? (
@@ -115,7 +114,6 @@ export default function Settings({ session }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {products.map((product) => {
             const image = getImage(product.id);
-
             return (
               <div
                 key={product.id}
@@ -152,7 +150,6 @@ export default function Settings({ session }) {
                       No Image
                     </div>
                   )}
-
                   <div>
                     <strong>{product.title || "Untitled Product"}</strong>
                     <p>₦{Number(product.price).toLocaleString()}</p>

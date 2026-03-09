@@ -1,4 +1,4 @@
-// src/pages/AddProduct.jsx - ✅ PERFECTLY FIXED for public_id + Settings delete
+// src/pages/AddProduct.jsx - ✅ FIXED UNSIGNED UPLOAD + public_id
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 
@@ -13,7 +13,6 @@ export default function AddProduct({ session }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  // ✅ Use session prop (faster + consistent with Settings)
   useEffect(() => {
     if (session?.user?.id) {
       setUserId(session.user.id);
@@ -24,15 +23,12 @@ export default function AddProduct({ session }) {
     setImages(Array.from(e.target.files));
   };
 
-  // ✅ FIXED: Return BOTH secure_url AND public_id
+  // ✅ FIXED: Unsigned upload - ONLY allowed parameters
   const uploadImage = async (file) => {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("upload_preset", UPLOAD_PRESET);
-    
-    // ✅ IMPROVED: Better public_id generation
-    formData.append("use_filename", true);
-    formData.append("unique_filename", true);
+    // ✅ NO use_filename/unique_filename - handled by preset
 
     console.log("📤 Uploading:", file.name);
 
@@ -45,29 +41,29 @@ export default function AddProduct({ session }) {
     console.log("☁️ Cloudinary response:", data);
 
     if (!res.ok || !data.secure_url) {
-      throw new Error(data.error?.message || "Image upload failed");
+      throw new Error(data.error?.message || "Upload failed");
     }
 
-    // ✅ RETURN BOTH for Supabase
+    // ✅ Returns BOTH for perfect Settings delete
     return {
-      image_url: data.secure_url,
-      public_id: data.public_id
+      image_url: data.secure_url,    // Homepage + Settings display
+      public_id: data.public_id      // Settings delete
     };
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!userId) return setMessage("❌ Please log in first");
+    if (!userId) return setMessage("❌ Please log in");
     if (!title.trim()) return setMessage("❌ Title required");
     if (!price || Number(price) <= 0) return setMessage("❌ Valid price required");
-    if (images.length === 0) return setMessage("❌ At least one image required");
+    if (images.length === 0) return setMessage("❌ Add at least one image");
 
     setLoading(true);
     setMessage("");
 
     try {
-      // 1️⃣ Create product
+      // 1. Create product
       const { data: product, error: productError } = await supabase
         .from("products")
         .insert([{
@@ -83,46 +79,40 @@ export default function AddProduct({ session }) {
         .single();
 
       if (productError) throw productError;
-      if (!product?.id) throw new Error("Failed to create product");
+      console.log("✅ Product ID:", product.id);
 
-      console.log("✅ Product created:", product.id);
-
-      // 2️⃣ Upload images + SAVE public_id
+      // 2. Upload all images
       const imageRecords = [];
       for (let i = 0; i < images.length; i++) {
-        const uploadResult = await uploadImage(images[i]);
-
+        const result = await uploadImage(images[i]);
+        
         imageRecords.push({
           product_id: product.id,
           seller_id: userId,
-          image_url: uploadResult.image_url,     // ✅ For display
-          public_id: uploadResult.public_id,     // ✅ For delete (Settings!)
+          image_url: result.image_url,     // ✅ Display
+          public_id: result.public_id,     // ✅ Delete
           is_primary: i === 0,
           position: i + 1
         });
       }
 
-      // 3️⃣ Batch insert ALL images
+      // 3. Batch insert images
       const { error: imgError } = await supabase
         .from("product_images")
         .insert(imageRecords);
 
       if (imgError) throw imgError;
 
-      console.log("✅ Images saved with public_id:", imageRecords);
+      console.log("✅ Saved", imageRecords.length, "images");
 
-      // 4️⃣ SUCCESS - Reset form
-      setMessage(`✅ Product "${title}" added with ${images.length} images!`);
-      setTitle("");
-      setPrice("");
-      setImages([]);
-      
-      // Clear file input
+      // 4. Success
+      setMessage(`✅ "${title}" added with ${images.length} images!`);
+      setTitle(""); setPrice(""); setImages([]);
       document.querySelector('input[type="file"]').value = "";
 
     } catch (err) {
       console.error("❌ Error:", err);
-      setMessage("❌ " + (err.message || "Failed to add product"));
+      setMessage("❌ " + err.message);
     } finally {
       setLoading(false);
     }
@@ -130,20 +120,18 @@ export default function AddProduct({ session }) {
 
   return (
     <div style={{ 
-      maxWidth: 500, 
-      margin: "40px auto", 
-      padding: "20px", 
-      borderRadius: 12, 
-      boxShadow: "0 4px 12px rgba(0,0,0,0.1)" 
+      maxWidth: 500, margin: "40px auto", padding: 24, 
+      borderRadius: 12, boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
+      background: "#fff"
     }}>
-      <h2 style={{ marginBottom: 24, color: "#1f2937" }}>Add New Product</h2>
+      <h2 style={{ marginBottom: 24, color: "#1f2937", textAlign: "center" }}>
+        Add New Product
+      </h2>
       
       {message && (
         <div style={{
-          padding: 12,
-          marginBottom: 20,
+          padding: 12, marginBottom: 20, borderRadius: 8,
           background: message.includes("✅") ? "#d1fae5" : "#fee2e2",
-          borderRadius: 8,
           borderLeft: `4px solid ${message.includes("✅") ? "#10b981" : "#ef4444"}`
         }}>
           {message}
@@ -155,28 +143,23 @@ export default function AddProduct({ session }) {
           type="text"
           placeholder="Product Title *"
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={e => setTitle(e.target.value)}
           style={{
-            padding: "12px",
-            border: "1px solid #d1d5db",
-            borderRadius: 8,
-            fontSize: "16px"
+            padding: "14px", border: "1px solid #d1d5db", borderRadius: 8,
+            fontSize: 16, transition: "border-color 0.2s"
           }}
           required
         />
         
         <input
           type="number"
-          min="0"
-          step="0.01"
+          min="0" step="0.01"
           placeholder="Price (₦) *"
           value={price}
-          onChange={(e) => setPrice(e.target.value)}
+          onChange={e => setPrice(e.target.value)}
           style={{
-            padding: "12px",
-            border: "1px solid #d1d5db",
-            borderRadius: 8,
-            fontSize: "16px"
+            padding: "14px", border: "1px solid #d1d5db", borderRadius: 8,
+            fontSize: 16
           }}
           required
         />
@@ -186,51 +169,41 @@ export default function AddProduct({ session }) {
           accept="image/*"
           multiple
           onChange={handleFileChange}
-          style={{ padding: "12px" }}
+          style={{ padding: "14px", border: "2px dashed #d1d5db", borderRadius: 8 }}
         />
 
         {images.length > 0 && (
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", padding: "12px", background: "#f8fafc", borderRadius: 8 }}>
+          <div style={{
+            display: "flex", gap: 12, flexWrap: "wrap", padding: 16,
+            background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0"
+          }}>
             {images.map((img, i) => (
               <img
                 key={i}
                 src={URL.createObjectURL(img)}
-                alt={`Preview ${i + 1}`}
+                alt={`Preview ${i+1}`}
                 style={{
-                  width: 90,
-                  height: 90,
-                  objectFit: "cover",
-                  borderRadius: 8,
-                  border: "2px solid #3b82f6"
+                  width: 80, height: 80, objectFit: "cover",
+                  borderRadius: 8, border: "2px solid #3b82f6"
                 }}
               />
             ))}
-            <div style={{ 
-              alignSelf: "center", 
-              fontSize: "14px", 
-              color: "#6b7280" 
-            }}>
+            <span style={{ alignSelf: "center", color: "#6b7280" }}>
               {images.length} image(s)
-            </div>
+            </span>
           </div>
         )}
 
         <button
           type="submit"
-          disabled={loading || !userId}
+          disabled={loading || !userId || images.length === 0}
           style={{
-            padding: "14px",
-            background: loading ? "#9ca3af" : "#3b82f6",
-            color: "white",
-            border: "none",
-            borderRadius: 8,
-            fontSize: "16px",
-            fontWeight: 600,
-            cursor: loading ? "not-allowed" : "pointer",
-            transition: "background 0.2s"
+            padding: "16px", background: "#10b981", color: "white",
+            border: "none", borderRadius: 8, fontSize: 16, fontWeight: 600,
+            cursor: "pointer", transition: "all 0.2s"
           }}
         >
-          {loading ? "⏳ Adding Product..." : `➕ Add Product`}
+          {loading ? "⏳ Adding..." : `➕ Add Product + ${images.length} Images`}
         </button>
       </form>
     </div>

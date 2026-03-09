@@ -1,6 +1,11 @@
 // src/pages/AddProduct.jsx
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
+import crypto from "crypto"; // for generating signature
+
+const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+const API_KEY = import.meta.env.VITE_CLOUDINARY_API_KEY;
+const API_SECRET = import.meta.env.VITE_CLOUDINARY_API_SECRET;
 
 export default function AddProduct() {
   const [userId, setUserId] = useState(null);
@@ -10,7 +15,6 @@ export default function AddProduct() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  // Get logged-in user
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -19,32 +23,40 @@ export default function AddProduct() {
     fetchUser();
   }, []);
 
-  // Convert file to base64
-  const toBase64 = (file) =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = (error) => reject(error);
-    });
-
-  // Handle file selection
   const handleFileChange = (e) => setImages(Array.from(e.target.files));
 
-  // Upload image via server API
-  const uploadImage = async (file) => {
-    const base64 = await toBase64(file);
-    const res = await fetch("/api/uploadImage", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ base64 }),
-    });
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
-    return data.url;
+  // Generate Cloudinary signature
+  const generateSignature = (paramsToSign) => {
+    const query = Object.keys(paramsToSign)
+      .sort()
+      .map((key) => `${key}=${paramsToSign[key]}`)
+      .join("&");
+    return crypto.createHmac("sha1", API_SECRET).update(query).digest("hex");
   };
 
-  // Submit product
+  // Upload a single image
+  const uploadImage = async (file) => {
+    const timestamp = Math.floor(Date.now() / 1000);
+    const paramsToSign = { timestamp };
+    const signature = generateSignature(paramsToSign);
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("api_key", API_KEY);
+    formData.append("timestamp", timestamp);
+    formData.append("signature", signature);
+    formData.append("folder", "products");
+
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message || "Upload failed");
+    return data.secure_url;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!userId) return setMessage("❌ Please log in first.");
@@ -62,7 +74,7 @@ export default function AddProduct() {
         .single();
       if (error) throw error;
 
-      // 2️⃣ Upload images via API and insert into Supabase
+      // 2️⃣ Upload images
       for (let i = 0; i < images.length; i++) {
         const url = await uploadImage(images[i]);
         await supabase.from("product_images").insert([{
@@ -89,40 +101,19 @@ export default function AddProduct() {
     <div style={{ maxWidth: 450, margin: "40px auto" }}>
       <h2>Add Product</h2>
       <form style={{ display: "flex", flexDirection: "column", gap: 12 }} onSubmit={handleSubmit}>
-        <input
-          type="text"
-          placeholder="Product Title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          required
-        />
-        <input
-          type="number"
-          placeholder="Price"
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
-          required
-        />
-
+        <input type="text" placeholder="Product Title" value={title} onChange={(e) => setTitle(e.target.value)} required />
+        <input type="number" placeholder="Price" value={price} onChange={(e) => setPrice(e.target.value)} required />
         <input type="file" accept="image/*" multiple onChange={handleFileChange} />
 
-        {/* Preview selected images */}
         {images.length > 0 && (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {images.map((img, idx) => (
-              <img
-                key={idx}
-                src={URL.createObjectURL(img)}
-                alt={`preview-${idx}`}
-                style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 6 }}
-              />
+              <img key={idx} src={URL.createObjectURL(img)} alt={`preview-${idx}`} style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 6 }} />
             ))}
           </div>
         )}
 
-        <button type="submit" disabled={loading}>
-          {loading ? "Adding..." : "Add Product"}
-        </button>
+        <button type="submit" disabled={loading}>{loading ? "Adding..." : "Add Product"}</button>
       </form>
 
       {message && <p style={{ marginTop: 10 }}>{message}</p>}

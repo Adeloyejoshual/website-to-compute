@@ -1,5 +1,13 @@
+// src/pages/HomePage.jsx
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+
+const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+
+// Generate Cloudinary URL from public_id
+const getCloudinaryUrl = (publicId, format = "jpg") => {
+  return `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/${publicId}.${format}`;
+};
 
 export default function HomePage() {
   const [products, setProducts] = useState([]);
@@ -27,7 +35,7 @@ export default function HomePage() {
     // Load images
     const { data: imagesData, error: imagesError } = await supabase
       .from("product_images")
-      .select("product_id,image_url,is_primary");
+      .select("product_id,public_id,image_url,is_primary");
 
     if (imagesError) {
       console.log(imagesError);
@@ -42,7 +50,17 @@ export default function HomePage() {
     const img = images.find(
       (i) => i.product_id === productId && i.is_primary
     );
-    return img?.image_url;
+
+    if (!img) return null;
+
+    // ✅ Future-proof: use public_id if exists, fallback to old image_url
+    if (img.public_id) {
+      return getCloudinaryUrl(img.public_id);
+    } else if (img.image_url) {
+      return img.image_url;
+    }
+
+    return null;
   }
 
   const filteredProducts = products.filter((p) =>
@@ -92,7 +110,7 @@ export default function HomePage() {
               {image ? (
                 <img
                   src={image}
-                  alt={product.title}
+                  alt={product.title || "Untitled Product"}
                   style={{
                     width: "100%",
                     height: "150px",

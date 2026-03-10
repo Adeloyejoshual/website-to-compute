@@ -2,8 +2,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL; // Your server.js URL
-const UPLOAD_FOLDER = "chatImages"; // The folder used for uploads
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
 export default function Settings({ session }) {
   const [products, setProducts] = useState([]);
@@ -18,6 +17,7 @@ export default function Settings({ session }) {
   const fetchProducts = async () => {
     if (!userId) return;
     setLoading(true);
+
     try {
       const { data: productsData, error: productsError } = await supabase
         .from("products")
@@ -54,14 +54,14 @@ export default function Settings({ session }) {
     setMessage("");
 
     try {
-      // 1️⃣ Delete all images in folder from Cloudinary
+      // 1️⃣ Delete all images in the product folder
       await fetch(`${BACKEND_URL}/delete-folder`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ folder: `${UPLOAD_FOLDER}/${productId}` }) // each product can have its own subfolder
+        body: JSON.stringify({ folder: `chatImages/${productId}` })
       });
 
-      // 2️⃣ Delete product images & product from Supabase
+      // 2️⃣ Delete images + product from Supabase
       await supabase.from("product_images").delete().eq("product_id", productId);
       await supabase.from("products").delete().eq("id", productId);
 
@@ -80,10 +80,10 @@ export default function Settings({ session }) {
       <h2 style={{ marginBottom: 24, color: "#1f2937" }}>My Products</h2>
 
       {message && (
-        <div style={{
-          marginBottom: 20,
-          padding: 12,
-          background: message.includes("✅") ? "#dcfce7" : "#fee2e2",
+        <div style={{ 
+          marginBottom: 20, 
+          padding: 12, 
+          background: message.includes("✅") ? "#dcfce7" : "#fee2e2", 
           borderRadius: 8,
           borderLeft: `4px solid ${message.includes("✅") ? "#10b981" : "#ef4444"}`
         }}>
@@ -118,7 +118,12 @@ export default function Settings({ session }) {
             return (
               <div key={product.id} style={{ border: "1px solid #e5e7eb", borderRadius: "12px", padding: "16px", background: "#fff" }}>
                 {imageSrc ? (
-                  <img src={imageSrc} alt={product.title} style={{ width: "100%", height: "140px", objectFit: "cover", borderRadius: "8px" }} loading="lazy" />
+                  <img
+                    src={imageSrc}
+                    alt={product.title}
+                    style={{ width: "100%", height: "140px", objectFit: "cover", borderRadius: "8px" }}
+                    loading="lazy"
+                  />
                 ) : (
                   <div style={{ height: "140px", background: "#f3f3f3", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "8px", color: "#999" }}>
                     No Image

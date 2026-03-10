@@ -1,8 +1,10 @@
+// src/pages/AddProduct.jsx
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+const UPLOAD_FOLDER = "chatImages"; // Folder for your marketplace
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
 export default function AddProduct({ session }) {
@@ -10,31 +12,28 @@ export default function AddProduct({ session }) {
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
   const [images, setImages] = useState([]);
-  const [previews, setPreviews] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  useEffect(() => {
-    if (session?.user?.id) setUserId(session.user.id);
-  }, [session]);
-
-  useEffect(() => {
-    const urls = images.map(file => URL.createObjectURL(file));
-    setPreviews(urls);
-    return () => urls.forEach(url => URL.revokeObjectURL(url));
-  }, [images]);
+  useEffect(() => { if (session?.user?.id) setUserId(session.user.id); }, [session]);
 
   const handleFileChange = e => setImages(Array.from(e.target.files));
 
-  const uploadImage = async file => {
+  const uploadImage = async (file) => {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("upload_preset", UPLOAD_PRESET);
+    formData.append("folder", UPLOAD_FOLDER); // ✅ Upload to folder
 
     const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, { method: "POST", body: formData });
     const data = await res.json();
     if (!res.ok || !data.secure_url) throw new Error(data.error?.message || "Upload failed");
-    return { image_url: data.secure_url, public_id: data.public_id };
+
+    // ✅ Store full folder path in public_id
+    return {
+      image_url: data.secure_url,
+      public_id: data.public_id // e.g., chatImages/filename
+    };
   };
 
   const handleSubmit = async e => {
@@ -63,7 +62,7 @@ export default function AddProduct({ session }) {
         product_id: product.id,
         seller_id: userId,
         image_url: img.image_url,
-        public_id: img.public_id,
+        public_id: img.public_id, // ✅ full folder path
         is_primary: i === 0,
         position: i + 1
       }));
@@ -71,13 +70,13 @@ export default function AddProduct({ session }) {
       if (imgError) throw imgError;
 
       setMessage(`✅ "${title}" added with ${images.length} images!`);
-      setTitle(""); setPrice(""); setImages([]); setPreviews([]);
+      setTitle(""); setPrice(""); setImages([]);
 
     } catch (err) {
       console.error(err);
       setMessage("❌ " + err.message);
 
-      // Rollback: delete any uploaded images from Cloudinary
+      // Rollback: delete uploaded images from Cloudinary
       const publicIds = uploadedImages.map(img => img.public_id);
       if (publicIds.length > 0) {
         await fetch(`${BACKEND_URL}/delete-product-images`, {
@@ -96,7 +95,6 @@ export default function AddProduct({ session }) {
       <input type="text" placeholder="Title" value={title} onChange={e => setTitle(e.target.value)} />
       <input type="number" placeholder="Price" value={price} onChange={e => setPrice(e.target.value)} />
       <input type="file" multiple onChange={handleFileChange} />
-      {previews.map((url,i) => <img key={i} src={url} width={80} />)}
       <button type="submit" disabled={loading}>Add Product</button>
       {message && <p>{message}</p>}
     </form>

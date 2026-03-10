@@ -2,7 +2,8 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 
-const BACKEND_URL = "https://website-to-compute-1mzb.onrender.com";
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL; // Your server.js URL
+const UPLOAD_FOLDER = "chatImages"; // The folder used for uploads
 
 export default function Settings({ session }) {
   const [products, setProducts] = useState([]);
@@ -17,7 +18,6 @@ export default function Settings({ session }) {
   const fetchProducts = async () => {
     if (!userId) return;
     setLoading(true);
-
     try {
       const { data: productsData, error: productsError } = await supabase
         .from("products")
@@ -44,32 +44,24 @@ export default function Settings({ session }) {
 
   useEffect(() => { if (userId) fetchProducts(); }, [userId]);
 
-  // Get main image for product
   const getImage = (productId) => images.find(i => i.product_id === productId && i.is_primary);
   const getImageSrc = (image) => image?.image_url || null;
-  const getPublicId = (image) => image?.public_id || null;
 
-  // Delete product + images
+  // Delete product + all images in its folder
   const handleDelete = async (productId) => {
-    if (!confirm("Delete this product and its images from Cloudinary?")) return;
+    if (!confirm("Delete this product and ALL its images from Cloudinary?")) return;
     setDeleting(prev => ({ ...prev, [productId]: true }));
     setMessage("");
 
     try {
-      const productImages = images.filter(i => i.product_id === productId);
-      const publicIds = productImages.map(getPublicId).filter(Boolean);
+      // 1️⃣ Delete all images in folder from Cloudinary
+      await fetch(`${BACKEND_URL}/delete-folder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folder: `${UPLOAD_FOLDER}/${productId}` }) // each product can have its own subfolder
+      });
 
-      // 1️⃣ Delete from Cloudinary
-      if (publicIds.length > 0) {
-        const res = await fetch(`${BACKEND_URL}/delete-product-images`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ publicIds })
-        });
-        if (!res.ok) console.error("Cloudinary deletion failed");
-      }
-
-      // 2️⃣ Delete from Supabase
+      // 2️⃣ Delete product images & product from Supabase
       await supabase.from("product_images").delete().eq("product_id", productId);
       await supabase.from("products").delete().eq("id", productId);
 

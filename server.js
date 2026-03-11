@@ -1,10 +1,8 @@
-// server.js
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 
-// Import routes
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const adminRoutes = require('./routes/adminRoutes');
@@ -18,20 +16,18 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// CockroachDB Pool
+// CockroachDB Connection
 const pool = new Pool({
   host: process.env.DB_HOST,
-  port: process.env.DB_PORT || 26257,
+  port: process.env.DB_PORT,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   ssl: { rejectUnauthorized: false }
 });
 
-app.locals.pool = pool; // make pool accessible in controllers
-
-// Health Check
-app.get('/', (req, res) => res.send('Minimart Backend Running'));
+// Make pool globally available
+app.locals.pool = pool;
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -41,14 +37,9 @@ app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/wallets', walletRoutes);
 
-// Error handling
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: err.message });
-});
+// Basic health check
+app.get('/', (req, res) => res.send('Minimart Backend Production Running'));
 
-// Start Server
+// Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-
-module.exports = app;

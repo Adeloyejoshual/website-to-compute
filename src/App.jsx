@@ -1,53 +1,42 @@
-// src/App.jsx
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { useEffect, useState } from "react";
-import { supabase } from "./lib/supabase";
+// App.jsx
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 
-import Home from "./pages/Home";
+import Homepage from "./pages/Homepage";
 import AddProduct from "./pages/AddProduct";
-import ProductDetails from "./pages/ProductDetails";
 import Login from "./pages/Login";
-import Settings from "./pages/Settings"; // ✅ New
-import Navbar from "./components/Navbar";
+import Register from "./pages/Register";
 
-export default function App() {
-  const [session, setSession] = useState(null);
+// Simple auth context
+export const AuthContext = React.createContext();
 
+function App() {
+  const [user, setUser] = useState(null);
+
+  // Check localStorage for token
   useEffect(() => {
-    const getSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      setSession(data.session);
-    };
-
-    getSession();
-
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-      }
-    );
-
-    return () => authListener.subscription.unsubscribe();
+    const token = localStorage.getItem("token");
+    if (token) {
+      // decode JWT for role if needed
+      setUser({ token });
+    }
   }, []);
 
   return (
-    <BrowserRouter>
-      <Navbar session={session} />
-
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route
-          path="/add"
-          element={session ? <AddProduct session={session} /> : <Login />}
-        />
-        <Route
-          path="/settings"
-          element={session ? <Settings session={session} /> : <Login />} // ✅ Protected route
-        />
-        <Route path="/product/:id" element={<ProductDetails />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="*" element={<div>404 - Page Not Found</div>} />
-      </Routes>
-    </BrowserRouter>
+    <AuthContext.Provider value={{ user, setUser }}>
+      <Router>
+        <Routes>
+          <Route path="/" element={<Homepage />} />
+          <Route
+            path="/add-product"
+            element={user ? <AddProduct /> : <Navigate to="/login" replace />}
+          />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+        </Routes>
+      </Router>
+    </AuthContext.Provider>
   );
 }
+
+export default App;

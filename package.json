@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "node server.js",
     "build": "echo Build step not required",
-    "postinstall": "cd frontend && npm install && npm run build",
+    "postinstall": "cd controllers/src && npm install && npm run build",
     "start": "node server.js"
   },
   "dependencies": {

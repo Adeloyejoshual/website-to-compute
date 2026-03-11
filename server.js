@@ -22,6 +22,7 @@ pool.connect()
   .then(() => console.log("✅ Connected to CockroachDB"))
   .catch(err => console.error("❌ CockroachDB connection error", err));
 
+// Export pool for controllers
 module.exports.pool = pool;
 
 // -------------------
@@ -53,9 +54,9 @@ app.use("/api/wallets", authenticateJWT, walletRoutes);
 app.use("/api/rewards", authenticateJWT, rewardRoutes);
 
 // -------------------
-// Serve React frontend
+// Serve React frontend in production
 // -------------------
-const frontendBuildPath = path.join(__dirname, "frontend/dist");
+const frontendBuildPath = path.join(__dirname, "dist"); // <-- updated path
 app.use(express.static(frontendBuildPath));
 
 app.get("*", (req, res) => {

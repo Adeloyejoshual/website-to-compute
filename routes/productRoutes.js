@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const productsController = require('../controllers/productsController');
+const { getProducts, createProduct } = require('../controllers/productsController');
 const { authenticateJWT } = require('../middleware/authMiddleware');
 const upload = require('../middleware/s3Upload');
 
-router.get('/', productsController.getProducts);
+// Public: list all products
+router.get('/', getProducts);
 
-// Protected: only sellers/admins can create products
-router.post('/', authenticateJWT, upload.single('image'), productsController.createProduct);
+// Protected: create product (seller/admin)
+router.post('/', authenticateJWT, upload.single('image'), createProduct);
 
 module.exports = router;

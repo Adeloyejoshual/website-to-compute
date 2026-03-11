@@ -1,6 +1,17 @@
 const { pool } = require('../server');
 
-// Get seller wallet
+// Get buyer wallet (if implemented)
+const getBuyerWallet = async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM buyer_wallets WHERE user_id=$1', [req.user.id]);
+    if (rows.length === 0) return res.status(404).json({ message: 'Wallet not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Seller wallet retrieval (already implemented)
 const getSellerWallet = async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT * FROM seller_wallets WHERE user_id=$1', [req.user.id]);
@@ -11,7 +22,7 @@ const getSellerWallet = async (req, res) => {
   }
 };
 
-// Update wallet after order payout
+// Update seller wallet (already used in ordersController)
 const updateSellerWallet = async (sellerId, amount) => {
   await pool.query(
     `UPDATE seller_wallets
@@ -22,4 +33,4 @@ const updateSellerWallet = async (sellerId, amount) => {
   );
 };
 
-module.exports = { getSellerWallet, updateSellerWallet };
+module.exports = { getBuyerWallet, getSellerWallet, updateSellerWallet };

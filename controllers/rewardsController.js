@@ -10,7 +10,7 @@ const getRewards = async (req, res) => {
   }
 };
 
-// Apply reward to order
+// Apply reward to an order
 const applyReward = async (orderId, rewardId) => {
   const client = await pool.connect();
   try {
@@ -18,8 +18,8 @@ const applyReward = async (orderId, rewardId) => {
 
     const { rows } = await client.query('SELECT discount_amount FROM rewards WHERE id=$1', [rewardId]);
     if (rows.length === 0) throw new Error('Reward not found');
-    const discount = rows[0].discount_amount;
 
+    const discount = rows[0].discount_amount;
     await client.query(
       'UPDATE orders SET total_amount = total_amount - $1 WHERE id=$2',
       [discount, orderId]

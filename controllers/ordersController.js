@@ -1,41 +1,31 @@
 const { pool } = require('../server');
+const { updateSellerWallet } = require('./walletsController');
 
-// Place an order
-const placeOrder = async (req, res) => {
+// Update order status (admin)
+const updateOrderStatus = async (req, res) => {
+  const { orderId } = req.params;
+  const { status } = req.body;
+
   const client = await pool.connect();
   try {
-    const { user_id, items, payment_reference } = req.body;
-    // items = [{ product_id, quantity }]
-
     await client.query('BEGIN');
 
-    // Calculate total
-    let totalAmount = 0;
-    for (let item of items) {
-      const { rows } = await client.query('SELECT price, seller_id FROM products WHERE id=$1', [item.product_id]);
-      if (rows.length === 0) throw new Error('Product not found');
-      totalAmount += rows[0].price * item.quantity;
-      item.seller_id = rows[0].seller_id;
-      item.price = rows[0].price;
-    }
+    const { rows: orderRows } = await client.query('SELECT * FROM orders WHERE id=$1', [orderId]);
+    if (orderRows.length === 0) throw new Error('Order not found');
 
-    // Create order
-    const { rows: orderRows } = await client.query(
-      'INSERT INTO orders (user_id, total_amount, status, payment_reference) VALUES ($1,$2,$3,$4) RETURNING *',
-      [user_id, totalAmount, 'pending', payment_reference]
-    );
-    const orderId = orderRows[0].id;
+    await client.query('UPDATE orders SET status=$1, updated_at=NOW() WHERE id=$2', [status, orderId]);
 
-    // Add order items
-    for (let item of items) {
-      await client.query(
-        'INSERT INTO order_items (order_id, product_id, quantity, price, seller_id) VALUES ($1,$2,$3,$4,$5)',
-        [orderId, item.product_id, item.quantity, item.price, item.seller_id]
-      );
+    // If order delivered/paid, update seller wallets
+    if (status === 'delivered' || status === 'paid') {
+      const { rows: items } = await client.query('SELECT product_id, quantity, price, seller_id FROM order_items WHERE order_id=$1', [orderId]);
+      for (let item of items) {
+        const payout = item.price * item.quantity;
+        await updateSellerWallet(item.seller_id, payout);
+      }
     }
 
     await client.query('COMMIT');
-    res.status(201).json({ order: orderRows[0], items });
+    res.json({ message: 'Order updated successfully' });
   } catch (err) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: err.message });
@@ -44,14 +34,4 @@ const placeOrder = async (req, res) => {
   }
 };
 
-// Get user orders
-const getUserOrders = async (req, res) => {
-  try {
-    const { rows } = await pool.query('SELECT * FROM orders WHERE user_id=$1 ORDER BY created_at DESC', [req.user.id]);
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-module.exports = { placeOrder, getUserOrders };
+module.exports = { updateOrderStatus };

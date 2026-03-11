@@ -4,10 +4,9 @@ const productsController = require('../controllers/productsController');
 const { authenticateJWT } = require('../middleware/authMiddleware');
 const upload = require('../middleware/s3Upload');
 
-// Get all products
 router.get('/', productsController.getProducts);
 
-// Create product (protected, seller/admin)
+// Protected: only sellers/admins can create products
 router.post('/', authenticateJWT, upload.single('image'), productsController.createProduct);
 
 module.exports = router;
